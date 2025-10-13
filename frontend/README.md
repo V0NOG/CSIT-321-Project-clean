@@ -1,7 +1,7 @@
 1. Install dependencies:
 
    ```bash
-   npm install
+   pnpm install
    # or
    yarn install
    ```
@@ -10,6 +10,6 @@
 
 2. Start the development server:
    ```bash
-   npm run dev
+   pnpm run dev
    # or
    yarn dev
