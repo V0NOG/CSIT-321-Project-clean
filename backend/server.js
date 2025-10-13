@@ -11,6 +11,7 @@ import totpRoutes from "./routes/totp.js";
 import keysRoutes from "./routes/keys.js";
 import fileRoutes from "./routes/files.js";
 import aclRoutes from "./routes/acl.js";
+import analyticsRoutes from "./routes/analytics.js";
 
 dotenv.config();
 
@@ -48,6 +49,7 @@ app.use("/api/keys", keysRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/acl", aclRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // central error handler
 // eslint-disable-next-line no-unused-vars

@@ -5,6 +5,7 @@ import FileKey from "../models/FileKey.js";
 import { uploadToDropbox, streamFromDropbox } from "../services/dropbox.js";
 import path from "node:path";
 import { deleteFromDropbox } from "../services/dropbox.js";
+import { appendAudit } from "../services/audit.js";
 
 function parseSort(sortStr) {
   if (!sortStr) return { createdAt: -1 };
@@ -136,6 +137,14 @@ export async function uploadCiphertext(req, res) {
       { $set: { status: "ready", dropboxPath: storedPath } }
     );
 
+    // record upload in audit log
+    await appendAudit({
+      actorId: userId,
+      action: "upload",
+      target: String(fileId),
+      meta: { name: meta.name, size: meta.size, mime: meta.mime }
+    });
+
     return res.status(200).json({ ok: true, path: storedPath });
   } catch (e) {
     console.error("[uploadCiphertext] error:", e);
@@ -160,6 +169,14 @@ export async function downloadFile(req, res) {
       "Content-Disposition",
       `attachment; filename="${doc.name}"`
     );
+
+    // record download intent in audit log (start of stream)
+    await appendAudit({
+      actorId: userId,
+      action: "download",
+      target: String(fileId),
+      meta: { name: doc.name, size: doc.size, mime: doc.mime }
+    });
 
     const stream = await streamFromDropbox(dropboxPath);
     stream.on("error", (err) => {
