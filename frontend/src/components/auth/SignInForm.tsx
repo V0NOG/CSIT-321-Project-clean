@@ -8,18 +8,32 @@ import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
-import AlertBanner from "../common/AlertBanner";
-import GoogleAuthButton from "../auth/GoogleAuthButton";
+import Alert from "../ui/alert/Alert";
+
+type AlertVariant = "success" | "warning" | "error" | "info";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberEmail, setRememberEmail] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [alert, setAlert] = useState<{ kind: "success"|"warning"|"error"|"info"; msg: string } | null>(null);
-  const navigate = useNavigate();
-  const { login } = useAuth();
+  const [showTotp, setShowTotp] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
 
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  // TailAdmin alert state
+  const [banner, setBanner] = useState<{
+    show: boolean;
+    variant: AlertVariant;
+    title: string;
+    message: string;
+  }>({ show: false, variant: "info", title: "", message: "" });
+
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
 
   useEffect(() => {
     const savedEmail = localStorage.getItem("savedEmail");
@@ -29,24 +43,44 @@ export default function SignInForm() {
     }
   }, []);
 
-  async function handleSubmit(e) {
+  function showAlert(variant: AlertVariant, title: string, message: string) {
+    setBanner({ show: true, variant, title, message });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (loading) return;
-    setAlert(null);
     setLoading(true);
+    setBanner((b) => ({ ...b, show: false }));
+
     try {
+      const body: any = {
+        email: formData.email,
+        password: formData.password,
+      };
+      if (showTotp && totpCode.trim()) {
+        body.totpCode = totpCode.trim();
+      }
+
       const res = await axios.post(
         "http://localhost:5050/api/auth/login",
-        { email: formData.email, password: formData.password },
-        { withCredentials: true, headers: { "Content-Type": "application/json" } }
+        body,
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "application/json" },
+        }
       );
 
       const { token, user } = res.data || {};
       if (token) localStorage.setItem("token", token);
+
       login(token || "", user);
 
-      if (rememberEmail) localStorage.setItem("savedEmail", formData.email);
-      else localStorage.removeItem("savedEmail");
+      if (rememberEmail) {
+        localStorage.setItem("savedEmail", formData.email);
+      } else {
+        localStorage.removeItem("savedEmail");
+      }
 
       navigate("/", { replace: true });
     } catch (err: any) {
@@ -54,7 +88,18 @@ export default function SignInForm() {
         err?.response?.data?.error ||
         err?.response?.data?.message ||
         "Login failed";
-      setAlert({ kind: "error", msg: apiMsg });
+
+      // If backend signals TOTP is required, reveal the TOTP field and guide the user
+      if (/totp required/i.test(apiMsg)) {
+        setShowTotp(true);
+        showAlert(
+          "warning",
+          "Two-Factor Required",
+          "Enter the 6-digit code from your authenticator app to finish signing in."
+        );
+      } else {
+        showAlert("error", "Error", apiMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -72,24 +117,27 @@ export default function SignInForm() {
         </Link>
       </div>
 
-      <div className="flex flex-col justify-center flex-1 w/full max-w-md mx-auto">
+      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
           <div className="mb-5 sm:mb-8">
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
               Sign In
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign in!
+              Enter your email and password to sign in.
             </p>
           </div>
 
-          {alert && (
-            <AlertBanner
-              kind={alert.kind}
-              title={alert.kind === "error" ? "Error" : "Notice"}
-              message={alert.msg}
-              className="mb-4"
-            />
+          {/* TailAdmin alert banner */}
+          {banner.show && (
+            <div className="mb-4">
+              <Alert
+                variant={banner.variant}
+                title={banner.title}
+                message={banner.message}
+                showLink={false}
+              />
+            </div>
           )}
 
           <form onSubmit={handleSubmit}>
@@ -136,6 +184,28 @@ export default function SignInForm() {
                 </div>
               </div>
 
+              {/* Conditionally render TOTP field when required */}
+              {showTotp && (
+                <div>
+                  <Label>
+                    6-Digit Authenticator Code{" "}
+                    <span className="text-error-500">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="123456"
+                    maxLength={6}
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                    required
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Open Google Authenticator, 1Password, or Authy to get your code.
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Checkbox
@@ -146,20 +216,18 @@ export default function SignInForm() {
                     Remember email
                   </span>
                 </div>
-                <Link to="/reset-password" className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400">
+                <Link
+                  to="/reset-password"
+                  className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
+                >
                   Forgot password?
                 </Link>
               </div>
 
-              <div className="grid gap-3">
+              <div>
                 <Button className="w-full" size="sm" type="submit" disabled={loading}>
-                  {loading ? "Signing in…" : "Sign in"}
+                  {loading ? "Signing in…" : showTotp ? "Verify & Sign in" : "Sign in"}
                 </Button>
-
-                {/* Google button – same endpoint works for sign in or sign up */}
-                <GoogleAuthButton
-                  onError={(msg) => setAlert({ kind: "error", msg })}
-                />
               </div>
             </div>
           </form>

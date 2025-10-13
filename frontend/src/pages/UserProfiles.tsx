@@ -4,7 +4,6 @@ import UserInfoCard from "../components/UserProfile/UserInfoCard";
 import UserAddressCard from "../components/UserProfile/UserAddressCard";
 import TwoFactorCard from "../components/UserProfile/TwoFactorCard";
 import PageMeta from "../components/common/PageMeta";
-import TOTPSetupCard from "../components/security/TOTPSetupCard.tsx";
 
 export default function UserProfiles() {
   return (
@@ -18,7 +17,6 @@ export default function UserProfiles() {
           <TwoFactorCard />
           <UserInfoCard />
           <UserAddressCard />
-          <TOTPSetupCard />
         </div>
       </div>
     </>
