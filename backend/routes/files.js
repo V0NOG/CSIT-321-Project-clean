@@ -1,4 +1,3 @@
-// backend/routes/files.js
 import express from "express";
 import { verifyToken } from "../middleware/auth.js";
 import {
@@ -7,17 +6,20 @@ import {
   uploadCiphertext,
   downloadFile,
   deleteFile,
+  setFileKey,
+  getFileKey,
 } from "../controllers/filesController.js";
 
 const router = express.Router();
 
-// List (paginated + filter + search + sort)
 router.get("/", verifyToken, listFiles);
-
-// Metadata init
 router.post("/init", verifyToken, express.json(), initUpload);
 
-// Raw ciphertext upload (use express.raw specifically for this route)
+// key endpoints
+router.post("/:id/key", verifyToken, express.json(), setFileKey);
+router.get("/:id/key", verifyToken, getFileKey);
+
+// raw ciphertext upload
 router.post(
   "/upload/:id",
   verifyToken,
@@ -25,10 +27,9 @@ router.post(
   uploadCiphertext
 );
 
-// Download
+// download ciphertext
 router.get("/:id/download", verifyToken, downloadFile);
 
-// Delete (optional)
 router.delete("/:id", verifyToken, deleteFile);
 
 export default router;

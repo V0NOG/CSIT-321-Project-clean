@@ -1,8 +1,7 @@
-// backend/controllers/filesController.js
-import mongoose from "mongoose";
 import File from "../models/File.js";
+import FileKey from "../models/FileKey.js";
+import { uploadToDropbox, streamFromDropbox, dropboxPathFor } from "../services/dropbox.js";
 
-// ---------- helpers ----------
 function parseSort(sortStr) {
   if (!sortStr) return { createdAt: -1 };
   const [field, dir = "desc"] = String(sortStr).split(":");
@@ -49,20 +48,12 @@ function buildTypeFilter(type) {
       ],
     };
   }
-
   return {};
 }
 
-function getBucket() {
-  const db = mongoose.connection.db;
-  return new mongoose.mongo.GridFSBucket(db, { bucketName: "cipherfiles" });
-}
-
-// ---------- routes ----------
-
-// GET /api/files?page=&limit=&q=&type=&sort=
+// ---------- LIST ----------
 export async function listFiles(req, res) {
-  const userId = req.user.id; // <-- we consistently use "owner"
+  const userId = req.user.id;
   const page = Math.max(1, parseInt(req.query.page ?? "1", 10) || 1);
   const limit = Math.min(2000, parseInt(req.query.limit ?? "20", 10) || 20);
   const q = (req.query.q || "").trim();
@@ -85,12 +76,11 @@ export async function listFiles(req, res) {
   res.json({ items, total, page, limit });
 }
 
-// POST /api/files/init
-// body: { name, size, mime }
+// ---------- INIT ----------
 export async function initUpload(req, res) {
   const userId = req.user.id;
   const { name, size, mime } = req.body || {};
-  if (!name || !Number.isFinite(Number(size))) {
+  if (!name || !Number.isFinite(size)) {
     return res.status(400).json({ error: "name and size are required" });
   }
 
@@ -99,102 +89,100 @@ export async function initUpload(req, res) {
     name,
     size: Number(size),
     mime: mime || "application/octet-stream",
-    status: "pending",
-    // NOTE: do NOT set dropboxPath here (avoids the unique-index null duplicate issue)
   });
 
   res.status(201).json({ fileId: doc._id.toString() });
 }
 
-// POST /api/files/upload/:id (Content-Type: application/octet-stream)
-// body: raw ciphertext bytes
+// ---------- KEY: SAVE ----------
+export async function setFileKey(req, res) {
+  const userId = req.user.id;
+  const fileId = req.params.id;
+  const { keyB64, ivB64 } = req.body || {};
+  if (!keyB64 || !ivB64) return res.status(400).json({ error: "keyB64 and ivB64 are required" });
+
+  const file = await File.findOne({ _id: fileId, owner: userId }).lean();
+  if (!file) return res.status(404).json({ error: "File not found" });
+
+  await FileKey.findOneAndUpdate(
+    { owner: userId, file: file._id },
+    { $set: { keyB64, ivB64 } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  res.json({ ok: true });
+}
+
+// ---------- KEY: LOAD ----------
+export async function getFileKey(req, res) {
+  const userId = req.user.id;
+  const fileId = req.params.id;
+
+  const doc = await FileKey.findOne({ owner: userId, file: fileId }).lean();
+  if (!doc) return res.status(404).json({ error: "Key not found" });
+
+  res.json({ keyB64: doc.keyB64, ivB64: doc.ivB64 });
+}
+
+// ---------- UPLOAD CIPHERTEXT → DROPBOX ----------
 export async function uploadCiphertext(req, res) {
   try {
     const userId = req.user.id;
     const fileId = req.params.id;
-
     const meta = await File.findOne({ _id: fileId, owner: userId });
     if (!meta) return res.status(404).json({ error: "File not found" });
 
-    const bucket = getBucket();
-    const uploadStream = bucket.openUploadStream(meta.name, {
-      contentType: "application/octet-stream",
-      metadata: {
-        owner: String(userId),
-        mime: meta.mime,
-        logicalSize: meta.size,
-      },
-    });
+    // req.body is a Buffer because route uses express.raw({ type: 'application/octet-stream' })
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
+    const path = dropboxPathFor(userId, fileId, meta.name);
 
-    uploadStream.on("error", (err) => {
-      console.error("[gridfs] upload error:", err);
-      return res.status(500).json({ error: "Upload failed" });
-    });
+    await uploadToDropbox(path, bytes);
 
-    uploadStream.on("finish", async () => {
-      try {
-        await File.updateOne(
-          { _id: fileId },
-          {
-            $set: {
-              status: "ready",
-              storage: {
-                ...(meta.storage || {}),
-                gridFsId: uploadStream.id, // <-- store where download expects it
-              },
-            },
-          }
-        );
-        return res.status(200).json({ ok: true });
-      } catch (e) {
-        console.error("[upload finish] update meta failed:", e);
-        return res.status(500).json({ error: "Upload metadata update failed" });
-      }
-    });
+    await File.updateOne(
+      { _id: fileId },
+      { $set: { status: "ready", storage: { dropboxPath: path } } }
+    );
 
-    // pipe raw body to GridFS
-    uploadStream.end(req.body);
+    res.json({ ok: true });
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: "Unexpected upload error" });
+    console.error("[uploadCiphertext] error:", e);
+    if (!res.headersSent) res.status(500).json({ error: "Upload failed" });
   }
 }
 
-// GET /api/files/:id/download
+// ---------- DOWNLOAD CIPHERTEXT ← DROPBOX ----------
 export async function downloadFile(req, res) {
   const userId = req.user.id;
   const fileId = req.params.id;
-
   const doc = await File.findOne({ _id: fileId, owner: userId });
-  const gridId = doc?.storage?.gridFsId;
-  if (!doc || !gridId) return res.status(404).json({ error: "Not found" });
+  const path = doc?.storage?.dropboxPath;
+  if (!doc || !path) return res.status(404).json({ error: "Not found" });
 
-  const bucket = getBucket();
   res.setHeader("Content-Type", "application/octet-stream");
   res.setHeader("Content-Disposition", `attachment; filename="${doc.name}"`);
 
-  const readStream = bucket.openDownloadStream(gridId);
-  readStream.on("error", (err) => {
-    console.error("GridFS download error:", err);
-    if (!res.headersSent) res.status(500).end("Download error");
-  });
-  readStream.pipe(res);
+  try {
+    const stream = await streamFromDropbox(path);
+    stream.on("error", (err) => {
+      console.error("Dropbox stream error:", err);
+      if (!res.headersSent) res.status(500).end("Download error");
+    });
+    stream.pipe(res);
+  } catch (e) {
+    console.error("[downloadFile] error:", e);
+    if (!res.headersSent) res.status(500).json({ error: "Download failed" });
+  }
 }
 
-// DELETE /api/files/:id
+// ---------- DELETE ----------
 export async function deleteFile(req, res) {
+  // If you want: also hit Dropbox delete API here.
   const userId = req.user.id;
   const fileId = req.params.id;
-
   const doc = await File.findOne({ _id: fileId, owner: userId });
   if (!doc) return res.status(404).json({ error: "Not found" });
 
-  const bucket = getBucket();
-  const gridId = doc.storage?.gridFsId;
-  if (gridId) {
-    try { await bucket.delete(gridId); } catch { /* ignore */ }
-  }
-
   await doc.deleteOne();
+  await FileKey.deleteOne({ owner: userId, file: fileId }).catch(() => {});
   res.json({ ok: true });
 }
