@@ -50,12 +50,6 @@ function buildTypeFilter(type) {
   return {};
 }
 
-function buildDropboxPath(userId, fileId, name) {
-  const safe = String(name).replace(/[^\w.\- ]+/g, "_").slice(0, 180);
-  // App-folder style path. If your app is full-access, prefix as needed.
-  return `/${userId}/${fileId}-${safe}`;
-}
-
 // GET /api/files
 export async function listFiles(req, res) {
   const userId = req.user.id;
@@ -135,9 +129,10 @@ export async function uploadCiphertext(req, res) {
 
     const storedPath = await uploadToDropbox(dbxPath, bytes);
 
+    // IMPORTANT: save to top-level dropboxPath (matches schema)
     await File.updateOne(
       { _id: fileId },
-      { $set: { status: "ready", storage: { dropboxPath: storedPath } } }
+      { $set: { status: "ready", dropboxPath: storedPath } }
     );
 
     return res.status(200).json({ ok: true, path: storedPath });
@@ -153,7 +148,8 @@ export async function downloadFile(req, res) {
     const userId = req.user.id;
     const fileId = req.params.id;
     const doc = await File.findOne({ _id: fileId, owner: userId }).lean();
-    const dropboxPath = doc?.storage?.dropboxPath;
+    // Prefer top-level dropboxPath; fallback to any legacy storage.dropboxPath
+    const dropboxPath = doc?.dropboxPath || doc?.storage?.dropboxPath;
     if (!doc || !dropboxPath) {
       return res.status(404).json({ error: "Not found" });
     }
