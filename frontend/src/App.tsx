@@ -17,6 +17,7 @@ import TextGeneratorPage from "./pages/Ai/TextGenerator";
 import ImageGeneratorPage from "./pages/Ai/ImageGenerator";
 import CodeGeneratorPage from "./pages/Ai/CodeGenerator";
 import VideoGeneratorPage from "./pages/Ai/VideoGenerator";
+import FolderFiles from "./pages/FolderFiles";
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/profile" element={<UserProfiles />} />
           <Route path="/blank" element={<Blank />} />
           <Route path="/file-manager" element={<FileManager />} />
+          <Route path="/file-manager/folder/:bucket" element={<FolderFiles />} />
           <Route path="/analytics" element={<Analytics />} />
         </Route>
 

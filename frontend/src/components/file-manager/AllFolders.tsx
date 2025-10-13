@@ -55,23 +55,27 @@ export default function AllFolders() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
           <FolderCard
             title="Images"
-            fileCount={`${buckets.Images.count} ${buckets.Images.count === 1 ? "File" : "Files"}`}
+            fileCount={`${buckets.Images.count}`}
             size={fmtBytes(buckets.Images.bytes)}
+            to="/file-manager/folder/images"
           />
           <FolderCard
             title="Documents"
-            fileCount={`${buckets.Documents.count} ${buckets.Documents.count === 1 ? "File" : "Files"}`}
+            fileCount={`${buckets.Documents.count}`}
             size={fmtBytes(buckets.Documents.bytes)}
+            to="/file-manager/folder/documents"
           />
           <FolderCard
             title="Apps"
-            fileCount={`${buckets.Apps.count} ${buckets.Apps.count === 1 ? "File" : "Files"}`}
+            fileCount={`${buckets.Apps.count}`}
             size={fmtBytes(buckets.Apps.bytes)}
+            to="/file-manager/folder/apps"
           />
           <FolderCard
             title="Downloads"
-            fileCount={`${buckets.Other.count} ${buckets.Other.count === 1 ? "File" : "Files"}`}
+            fileCount={`${buckets.Other.count}`}
             size={fmtBytes(buckets.Other.bytes)}
+            to="/file-manager/folder/downloads"
           />
         </div>
       </div>

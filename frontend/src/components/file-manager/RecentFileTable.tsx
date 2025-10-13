@@ -59,11 +59,11 @@ type AlertState =
   | { kind: "none" }
   | { kind: "success" | "warning" | "error" | "info"; title: string; message: string };
 
-export default function RecentFileTable() {
+export default function RecentFileTable({ initialType, headerTitle }: { initialType?: string; headerTitle?: string }) {
   const {
     items, total, page, limit, loading,
     setPage, setLimit, setQuery, setSort, setType, refresh
-  } = useFiles({ page: 1, limit: 10, sort: "createdAt:desc" });
+  } = useFiles({ page: 1, limit: 10, sort: "createdAt:desc", type: initialType });
 
   const files = items || [];
   const [q, setQ] = useState("");
@@ -203,7 +203,7 @@ export default function RecentFileTable() {
 
       <div className="flex flex-col gap-3 px-6 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Recent Files</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{headerTitle || "Recent Files"}</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">{total} total</p>
         </div>
 
