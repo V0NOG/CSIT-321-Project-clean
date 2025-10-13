@@ -9,6 +9,15 @@ import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import AlternativeLayout from "./layout/AlternativeLayout";
+
+import FileManager from "./pages/FileManager";
+import Analytics from "./pages/Analytics";
+
+import TextGeneratorPage from "./pages/Ai/TextGenerator";
+import ImageGeneratorPage from "./pages/Ai/ImageGenerator";
+import CodeGeneratorPage from "./pages/Ai/CodeGenerator";
+import VideoGeneratorPage from "./pages/Ai/VideoGenerator";
 
 export default function App() {
   return (
@@ -31,10 +40,21 @@ export default function App() {
           <Route path="/profile" element={<UserProfiles />} />
           <Route path="/blank" element={<Blank />} />
           <Route path="/example" element={<Examples />} />
+          <Route path="/file-manager" element={<FileManager />} />
+          <Route path="/analytics" element={<Analytics />} />
         </Route>
 
         {/* Fallback Route */}
         <Route path="*" element={<NotFound />} />
+
+        {/* Alternative Layout - for special pages */}
+          <Route element={<AlternativeLayout />}>
+            {/* AI Generator */}
+            <Route path="/text-generator" element={<TextGeneratorPage />} />
+            <Route path="/image-generator" element={<ImageGeneratorPage />} />
+            <Route path="/code-generator" element={<CodeGeneratorPage />} />
+            <Route path="/video-generator" element={<VideoGeneratorPage />} />
+          </Route>
       </Routes>
     </Router>
   );

@@ -22,8 +22,6 @@ import { ReactComponent as DollarLineIcon } from "./dollar-line.svg?react";
 import { ReactComponent as TrashBinIcon } from "./trash.svg?react";
 import { ReactComponent as AngleUpIcon } from "./angle-up.svg?react";
 import { ReactComponent as AngleDownIcon } from "./angle-down.svg?react";
-import { ReactComponent as AngleLeftIcon } from "./angle-left.svg?react";
-import { ReactComponent as AngleRightIcon } from "./angle-right.svg?react";
 import { ReactComponent as PencilIcon } from "./pencil.svg?react";
 import { ReactComponent as CheckLineIcon } from "./check-line.svg?react";
 import { ReactComponent as CloseLineIcon } from "./close-line.svg?react";
@@ -54,8 +52,20 @@ import { ReactComponent as ChatIcon } from "./chat.svg?react";
 import { ReactComponent as MoreDotIcon } from "./moredot.svg?react";
 import { ReactComponent as AlertHexaIcon } from "./alert-hexa.svg?react";
 import { ReactComponent as ErrorHexaIcon } from "./info-hexa.svg?react";
+import { ReactComponent as BoxTapped } from "./box-tapped.svg?react";
+import { ReactComponent as TruckDelivery } from "./truck-delivery.svg?react";
+import { ReactComponent as BoxMoving } from "./box-moving.svg?react";
+import { ReactComponent as AiIcon } from "./ai-icon.svg?react";
+import { ReactComponent as CartIcon } from "./cart-icon.svg?react";
+import { ReactComponent as CallIcon } from "./call-icon.svg?react";
 
 export {
+  CallIcon,
+  CartIcon,
+  AiIcon,
+  BoxMoving,
+  TruckDelivery,
+  BoxTapped,
   ErrorHexaIcon,
   AlertHexaIcon,
   MoreDotIcon,
@@ -110,6 +120,4 @@ export {
   HorizontaLDots,
   ChevronUpIcon,
   ChatIcon,
-  AngleLeftIcon,
-  AngleRightIcon,
 };

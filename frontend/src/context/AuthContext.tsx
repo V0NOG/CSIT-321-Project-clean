@@ -8,28 +8,28 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
 
   useEffect(() => {
-    if (token) {
-      axios.get("http://localhost:5050/api/user/me", {
+    if (!token) return;
+    axios
+      .get("http://localhost:5050/api/user/me", {
         headers: { Authorization: `Bearer ${token}` },
       })
-        .then(res => setUser(res.data))
-        .catch(() => {
-          setToken("");
-          setUser(null);
-          localStorage.removeItem("token");
-        });
-    }
+      .then((res) => setUser(res.data))
+      .catch((err) => {
+        console.warn("Auth /me failed", err?.response?.status, err?.response?.data);
+        localStorage.removeItem("token");
+        setToken("");
+        setUser(null);
+      });
   }, [token]);
 
-  const login = (token, user) => {
-    localStorage.setItem("token", token);
-    setToken(token);
-    setUser(user);
+  const login = (newToken, newUser) => {
+    localStorage.setItem("token", newToken);
+    setToken(newToken);
+    setUser(newUser || null);
   };
 
   const logout = () => {
     localStorage.removeItem("token");
-    
     setToken("");
     setUser(null);
   };

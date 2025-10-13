@@ -11,6 +11,7 @@ type SidebarContextType = {
   setIsHovered: (isHovered: boolean) => void;
   setActiveItem: (item: string | null) => void;
   toggleSubmenu: (item: string) => void;
+  setIsMobileOpen: (open: boolean) => void;
 };
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -35,7 +36,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 768;
+      const mobile = window.innerWidth < 1280; // Mobile behavior up to xl breakpoint (1280px)
       setIsMobile(mobile);
       if (!mobile) {
         setIsMobileOpen(false);
@@ -75,6 +76,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsHovered,
         setActiveItem,
         toggleSubmenu,
+        setIsMobileOpen,
       }}
     >
       {children}
