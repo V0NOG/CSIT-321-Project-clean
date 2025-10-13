@@ -96,3 +96,22 @@ export async function streamFromDropbox(path) {
     return Readable.fromWeb(res.body);
   });
 }
+
+// Delete a file in Dropbox at a given path
+export async function deleteFromDropbox(path) {
+  return withValidToken(async (token) => {
+    const res = await fetch("https://api.dropboxapi.com/2/files/delete_v2", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`[dropbox delete] ${res.status} ${t}`);
+    }
+    return true;
+  });
+}

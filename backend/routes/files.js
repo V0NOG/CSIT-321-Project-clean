@@ -8,6 +8,8 @@ import {
   getFileKey,
   uploadCiphertext,
   downloadFile,
+  renameFile,
+  deleteFile,
 } from "../controllers/filesController.js";
 
 const router = express.Router();
@@ -27,5 +29,10 @@ router.post(
 );
 
 router.get("/:id/download", verifyToken, downloadFile);
+
+// rename
+router.put("/:id", verifyToken, express.json(), renameFile);
+// delete
+router.delete("/:id", verifyToken, deleteFile);
 
 export default router;

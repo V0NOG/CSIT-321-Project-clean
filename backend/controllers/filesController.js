@@ -4,6 +4,7 @@ import File from "../models/File.js";
 import FileKey from "../models/FileKey.js";
 import { uploadToDropbox, streamFromDropbox } from "../services/dropbox.js";
 import path from "node:path";
+import { deleteFromDropbox } from "../services/dropbox.js";
 
 function parseSort(sortStr) {
   if (!sortStr) return { createdAt: -1 };
@@ -169,5 +170,57 @@ export async function downloadFile(req, res) {
   } catch (e) {
     console.error("[downloadFile] error:", e);
     if (!res.headersSent) return res.status(500).json({ error: "Download failed" });
+  }
+}
+
+// PUT /api/files/:id   (rename)
+export async function renameFile(req, res) {
+  try {
+    const userId = req.user.id;
+    const fileId = req.params.id;
+    const { name } = req.body || {};
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: "name is required" });
+    }
+
+    const updated = await File.findOneAndUpdate(
+      { _id: fileId, owner: userId },
+      { $set: { name: String(name).trim() } },
+      { new: true }
+    ).lean();
+
+    if (!updated) return res.status(404).json({ error: "File not found" });
+    res.json({ ok: true, file: updated });
+  } catch (e) {
+    console.error("[renameFile] error:", e);
+    res.status(500).json({ error: "Rename failed" });
+  }
+}
+
+// DELETE /api/files/:id  (delete DB rows and Dropbox blob)
+export async function deleteFile(req, res) {
+  try {
+    const userId = req.user.id;
+    const fileId = req.params.id;
+
+    const doc = await File.findOne({ _id: fileId, owner: userId }).lean();
+    if (!doc) return res.status(404).json({ error: "File not found" });
+
+    // best-effort delete from Dropbox
+    const dropboxPath = doc.dropboxPath || doc?.storage?.dropboxPath;
+    if (dropboxPath) {
+      try { await deleteFromDropbox(dropboxPath); } catch (e) {
+        console.warn("[deleteFile] dropbox delete failed:", e?.message || e);
+      }
+    }
+
+    // remove key + file doc
+    await FileKey.deleteMany({ file: fileId, owner: userId });
+    await File.deleteOne({ _id: fileId, owner: userId });
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[deleteFile] error:", e);
+    res.status(500).json({ error: "Delete failed" });
   }
 }

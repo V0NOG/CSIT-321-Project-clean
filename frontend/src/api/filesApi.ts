@@ -127,3 +127,15 @@ export async function downloadDecryptedBlob(row: { _id: string; name: string; mi
   const plainBlob = await decryptAesGcmToBlob(cipherBlob, fileKey, row.mime || "application/octet-stream");
   return plainBlob;
 }
+
+// RENAME
+export async function renameFile(id: string, name: string) {
+  const res = await api.put(`/files/${id}`, { name }, { headers: { ...authHeader() } });
+  return res.data as { ok: boolean; file: FileRow };
+}
+
+// DELETE
+export async function deleteFile(id: string) {
+  const res = await api.delete(`/files/${id}`, { headers: { ...authHeader() } });
+  return res.data as { ok: boolean };
+}

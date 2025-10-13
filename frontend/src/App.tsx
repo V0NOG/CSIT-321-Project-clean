@@ -3,11 +3,10 @@ import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import NotFound from "./pages/OtherPage/NotFound";
 import UserProfiles from "./pages/UserProfiles";
-import Examples from "./pages/Reports/Example";
 import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
-import Home from "./pages/Dashboard/Home";
+import Home from "./pages/FileManager";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AlternativeLayout from "./layout/AlternativeLayout";
 
@@ -39,7 +38,6 @@ export default function App() {
           <Route index path="/" element={<Home />} />
           <Route path="/profile" element={<UserProfiles />} />
           <Route path="/blank" element={<Blank />} />
-          <Route path="/example" element={<Examples />} />
           <Route path="/file-manager" element={<FileManager />} />
           <Route path="/analytics" element={<Analytics />} />
         </Route>
