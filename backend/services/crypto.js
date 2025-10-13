@@ -1,7 +1,7 @@
 // backend/services/crypto.js
 import crypto from "crypto";
 
-const encKeyB64 = process.env.TOTP_ENC_KEY || ""; // 32 bytes (base64 or hex)
+const encKeyB64 = process.env.TOTP_ENC_KEY || "6058eab682b33c548b12cab581081df6aa0a4863c3ef863381cc7fec4b6779ad";
 const getKey = () => {
   if (!encKeyB64) throw new Error("TOTP_ENC_KEY missing");
   // accept base64 or hex

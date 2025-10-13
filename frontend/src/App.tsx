@@ -18,6 +18,7 @@ import ImageGeneratorPage from "./pages/Ai/ImageGenerator";
 import CodeGeneratorPage from "./pages/Ai/CodeGenerator";
 import VideoGeneratorPage from "./pages/Ai/VideoGenerator";
 import FolderFiles from "./pages/FolderFiles";
+import TotpSetup from "./pages/Security/TotpSetup";
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
           }
         >
           <Route index path="/" element={<Home />} />
+          <Route path="/security/mfa" element={<TotpSetup />} />
           <Route path="/profile" element={<UserProfiles />} />
           <Route path="/blank" element={<Blank />} />
           <Route path="/file-manager" element={<FileManager />} />

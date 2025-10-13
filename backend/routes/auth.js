@@ -1,5 +1,5 @@
 import express from "express";
-import { register, login } from "../controllers/authController.js";
+import { register, login, googleLogin } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/auth.js";
 import { JWT_SECRET } from "../config/jwt.js";
 
@@ -7,6 +7,8 @@ const router = express.Router();
 
 router.post("/register", register);
 router.post("/login", login);
+
+router.post("/google", express.json(), googleLogin);
 
 // DEBUG: decode token without verifying signature (safe to keep or remove later)
 router.get("/debug/decode", (req, res) => {

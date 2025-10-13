@@ -2,6 +2,10 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { OAuth2Client } from "google-auth-library";
+
+const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || "").trim();
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 // TOTP: guard against module or runtime errors so login never 500s from this
 let verifyTotpIfEnabled = async () => true;
@@ -82,6 +86,66 @@ const clearAuthCookies = (res) => {
 };
 
 // ---------- Controllers ----------
+export const googleLogin = async (req, res) => {
+  try {
+    ensureSecretsOrThrow();
+
+    if (!googleClient) {
+      return res.status(500).json({ error: "Server misconfiguration: GOOGLE_CLIENT_ID missing" });
+    }
+
+    const { idToken } = req.body || {};
+    if (!idToken) return res.status(400).json({ error: "Missing idToken" });
+
+    // Verify ID token with Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    // Typical fields: email, given_name, family_name, email_verified, picture, sub
+    if (!payload?.email || !payload.email_verified) {
+      return res.status(401).json({ error: "Google email not verified" });
+    }
+
+    const email = payload.email.toLowerCase();
+    let user = await User.findOne({ email });
+    if (!user) {
+      // Provision a user (passwordless)
+      user = await User.create({
+        firstName: payload.given_name || "Google",
+        lastName:  payload.family_name || "User",
+        email,
+        // Random hash so field is non-empty (not used for Google auth)
+        password: await bcrypt.hash(`google-${payload.sub}-${Date.now()}`, 12),
+        role: "staff",
+      });
+    }
+
+    // Normal JWT issuance
+    const accessToken = signAccess({ sub: user._id.toString(), role: user.role });
+    const refreshToken = signRefresh({ sub: user._id.toString(), role: user.role, ver: user.tokenVersion });
+
+    setAuthCookies(res, accessToken, refreshToken);
+
+    return res.json({
+      message: "Logged in with Google",
+      token: accessToken,
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error("[googleLogin] error:", err);
+    return res.status(401).json({ error: "Google login failed" });
+  }
+};
+
 export const register = async (req, res) => {
   try {
     ensureSecretsOrThrow();
