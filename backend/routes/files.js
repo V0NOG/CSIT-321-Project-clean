@@ -1,13 +1,13 @@
+// backend/routes/files.js
 import express from "express";
 import { verifyToken } from "../middleware/auth.js";
 import {
   listFiles,
   initUpload,
-  uploadCiphertext,
-  downloadFile,
-  deleteFile,
   setFileKey,
   getFileKey,
+  uploadCiphertext,
+  downloadFile,
 } from "../controllers/filesController.js";
 
 const router = express.Router();
@@ -15,11 +15,10 @@ const router = express.Router();
 router.get("/", verifyToken, listFiles);
 router.post("/init", verifyToken, express.json(), initUpload);
 
-// key endpoints
 router.post("/:id/key", verifyToken, express.json(), setFileKey);
 router.get("/:id/key", verifyToken, getFileKey);
 
-// raw ciphertext upload
+// raw ciphertext (client-encrypted)
 router.post(
   "/upload/:id",
   verifyToken,
@@ -27,9 +26,6 @@ router.post(
   uploadCiphertext
 );
 
-// download ciphertext
 router.get("/:id/download", verifyToken, downloadFile);
-
-router.delete("/:id", verifyToken, deleteFile);
 
 export default router;

@@ -1,6 +1,9 @@
+// backend/controllers/filesController.js
+import mongoose from "mongoose";
 import File from "../models/File.js";
 import FileKey from "../models/FileKey.js";
-import { uploadToDropbox, streamFromDropbox, dropboxPathFor } from "../services/dropbox.js";
+import { uploadToDropbox, streamFromDropbox } from "../services/dropbox.js";
+import path from "node:path";
 
 function parseSort(sortStr) {
   if (!sortStr) return { createdAt: -1 };
@@ -11,11 +14,9 @@ function parseSort(sortStr) {
 function buildTypeFilter(type) {
   if (!type || type === "all") return {};
   const t = String(type).toLowerCase();
-
   if (["image", "images"].includes(t)) return { mime: { $regex: "^image/", $options: "i" } };
   if (["video", "videos"].includes(t)) return { mime: { $regex: "^video/", $options: "i" } };
   if (["audio", "audios"].includes(t)) return { mime: { $regex: "^audio/", $options: "i" } };
-
   if (["document", "documents", "docs"].includes(t)) {
     const docExts = ["pdf","doc","docx","ppt","pptx","xls","xlsx","txt","rtf","md","csv"];
     return {
@@ -25,12 +26,10 @@ function buildTypeFilter(type) {
       ],
     };
   }
-
   if (["app", "apps", "archive", "package"].includes(t)) {
     const appExts = ["zip", "rar", "7z", "apk", "dmg", "exe", "msi"];
     return { name: { $regex: `\\.(${appExts.join("|")})$`, $options: "i" } };
   }
-
   if (["other", "others"].includes(t)) {
     const docExts = ["pdf","doc","docx","ppt","pptx","xls","xlsx","txt","rtf","md","csv"];
     const appExts = ["zip", "rar", "7z", "apk", "dmg", "exe", "msi"];
@@ -51,7 +50,13 @@ function buildTypeFilter(type) {
   return {};
 }
 
-// ---------- LIST ----------
+function buildDropboxPath(userId, fileId, name) {
+  const safe = String(name).replace(/[^\w.\- ]+/g, "_").slice(0, 180);
+  // App-folder style path. If your app is full-access, prefix as needed.
+  return `/${userId}/${fileId}-${safe}`;
+}
+
+// GET /api/files
 export async function listFiles(req, res) {
   const userId = req.user.id;
   const page = Math.max(1, parseInt(req.query.page ?? "1", 10) || 1);
@@ -59,72 +64,63 @@ export async function listFiles(req, res) {
   const q = (req.query.q || "").trim();
   const type = (req.query.type || "").toLowerCase();
   const sort = parseSort(req.query.sort);
-
   const filter = { owner: userId };
   if (q) filter.name = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
-
   const typeFilter = buildTypeFilter(type);
   if (Object.keys(typeFilter).length) Object.assign(filter, typeFilter);
-
   const skip = (page - 1) * limit;
-
   const [items, total] = await Promise.all([
     File.find(filter).sort(sort).skip(skip).limit(limit).lean(),
     File.countDocuments(filter),
   ]);
-
   res.json({ items, total, page, limit });
 }
 
-// ---------- INIT ----------
+// POST /api/files/init
 export async function initUpload(req, res) {
   const userId = req.user.id;
   const { name, size, mime } = req.body || {};
   if (!name || !Number.isFinite(size)) {
     return res.status(400).json({ error: "name and size are required" });
   }
-
   const doc = await File.create({
     owner: userId,
     name,
     size: Number(size),
     mime: mime || "application/octet-stream",
+    status: "init",
   });
-
   res.status(201).json({ fileId: doc._id.toString() });
 }
 
-// ---------- KEY: SAVE ----------
+// POST /api/files/:id/key  (save wrapped key)
 export async function setFileKey(req, res) {
   const userId = req.user.id;
   const fileId = req.params.id;
   const { wrappedKeyB64 } = req.body || {};
-  if (!wrappedKeyB64) return res.status(400).json({ error: "wrappedKeyB64 is required" });
+  if (!wrappedKeyB64) return res.status(400).json({ error: "wrappedKeyB64 required" });
 
-  const file = await File.findOne({ _id: fileId, owner: userId }).lean();
-  if (!file) return res.status(404).json({ error: "File not found" });
+  const exists = await File.findOne({ _id: fileId, owner: userId });
+  if (!exists) return res.status(404).json({ error: "File not found" });
 
-  await FileKey.findOneAndUpdate(
-    { owner: userId, file: file._id },
+  const doc = await FileKey.findOneAndUpdate(
+    { file: fileId, owner: userId },
     { $set: { wrappedKeyB64 } },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, new: true }
   );
-
-  res.json({ ok: true });
+  return res.json({ ok: true, id: doc._id.toString() });
 }
 
-// ---------- KEY: LOAD ----------
+// GET /api/files/:id/key (return wrapped key)
 export async function getFileKey(req, res) {
   const userId = req.user.id;
   const fileId = req.params.id;
-
-  const doc = await FileKey.findOne({ owner: userId, file: fileId }).lean();
-  if (!doc) return res.status(404).json({ error: "Key not found" });
-
-  res.json({ wrappedKeyB64: doc.wrappedKeyB64 });
+  const keyDoc = await FileKey.findOne({ file: fileId, owner: userId }).lean();
+  if (!keyDoc) return res.status(404).json({ error: "no key" });
+  return res.json({ wrappedKeyB64: keyDoc.wrappedKeyB64 });
 }
 
-// ---------- UPLOAD CIPHERTEXT → DROPBOX ----------
+// POST /api/files/upload/:id  (ciphertext -> Dropbox)
 export async function uploadCiphertext(req, res) {
   try {
     const userId = req.user.id;
@@ -133,56 +129,49 @@ export async function uploadCiphertext(req, res) {
     if (!meta) return res.status(404).json({ error: "File not found" });
 
     const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
-    const path = dropboxPathFor(userId, fileId, meta.name);
+    // Store under a deterministic path (avoid collisions, allow overwrite via autorename)
+    const ext = path.extname(meta.name) || ".bin";
+    const dbxPath = `/csit321/${userId}/${fileId}${ext}.enc`;
 
-    await uploadToDropbox(path, bytes);
+    const storedPath = await uploadToDropbox(dbxPath, bytes);
 
-    // DOT-SET so we don't clobber storage object
     await File.updateOne(
       { _id: fileId },
-      { $set: { status: "ready", "storage.dropboxPath": path } }
+      { $set: { status: "ready", storage: { dropboxPath: storedPath } } }
     );
 
-    res.json({ ok: true });
+    return res.status(200).json({ ok: true, path: storedPath });
   } catch (e) {
     console.error("[uploadCiphertext] error:", e);
-    if (!res.headersSent) res.status(500).json({ error: "Upload failed" });
+    return res.status(500).json({ error: "Upload failed" });
   }
 }
 
-// ---------- DOWNLOAD CIPHERTEXT ← DROPBOX ----------
+// GET /api/files/:id/download  (ciphertext stream from Dropbox)
 export async function downloadFile(req, res) {
-  const userId = req.user.id;
-  const fileId = req.params.id;
-  const doc = await File.findOne({ _id: fileId, owner: userId });
-  const path = doc?.storage?.dropboxPath;
-  if (!doc || !path) return res.status(404).json({ error: "Not found" });
-
-  res.setHeader("Content-Type", "application/octet-stream");
-  res.setHeader("Content-Disposition", `attachment; filename="${doc.name}"`);
-
   try {
-    const stream = await streamFromDropbox(path);
+    const userId = req.user.id;
+    const fileId = req.params.id;
+    const doc = await File.findOne({ _id: fileId, owner: userId }).lean();
+    const dropboxPath = doc?.storage?.dropboxPath;
+    if (!doc || !dropboxPath) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${doc.name}"`
+    );
+
+    const stream = await streamFromDropbox(dropboxPath);
     stream.on("error", (err) => {
-      console.error("Dropbox stream error:", err);
+      console.error("[dropbox download stream] error:", err);
       if (!res.headersSent) res.status(500).end("Download error");
     });
     stream.pipe(res);
   } catch (e) {
     console.error("[downloadFile] error:", e);
-    if (!res.headersSent) res.status(500).json({ error: "Download failed" });
+    if (!res.headersSent) return res.status(500).json({ error: "Download failed" });
   }
-}
-
-// ---------- DELETE ----------
-export async function deleteFile(req, res) {
-  // If you want: also hit Dropbox delete API here.
-  const userId = req.user.id;
-  const fileId = req.params.id;
-  const doc = await File.findOne({ _id: fileId, owner: userId });
-  if (!doc) return res.status(404).json({ error: "Not found" });
-
-  await doc.deleteOne();
-  await FileKey.deleteOne({ owner: userId, file: fileId }).catch(() => {});
-  res.json({ ok: true });
 }

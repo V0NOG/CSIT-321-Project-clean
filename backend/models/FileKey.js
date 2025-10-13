@@ -1,16 +1,16 @@
+// backend/models/FileKey.js
 import mongoose from "mongoose";
+const { Schema } = mongoose;
 
-const FileKeySchema = new mongoose.Schema(
+const FileKeySchema = new Schema(
   {
-    owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true, required: true },
-    file:  { type: mongoose.Schema.Types.ObjectId, ref: "File",  required: true },
-    // wrapped file key blob (base64). This is the AES-GCM-wrapped (key+iv) using client device master key
-    wrappedKeyB64: { type: String, required: true },
+    file: { type: Schema.Types.ObjectId, ref: "File", required: true },
+    owner: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    wrappedKeyB64: { type: String, required: true }, // base64 of wrapped key
   },
   { timestamps: true }
 );
 
-// unique per (owner, file)
-FileKeySchema.index({ owner: 1, file: 1 }, { unique: true });
+FileKeySchema.index({ file: 1, owner: 1 }, { unique: true });
 
-export default mongoose.model("FileKey", FileKeySchema, "filekeys");
+export default mongoose.model("FileKey", FileKeySchema);

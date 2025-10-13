@@ -1,53 +1,75 @@
 // src/crypto/decrypt.ts
+//
+// Minimal decrypt helpers to match our upload/download flow.
+//
+// Assumptions (aligns with the encrypt side we used earlier):
+// - The file was encrypted with AES-GCM (256-bit key).
+// - The ciphertext blob is prefixed with a 12-byte IV: [ IV(12) | GCM-ciphertext+tag ].
+// - The "wrapped" key stored in Mongo is just a base64 of the raw 32-byte file key
+//   (i.e., not additionally wrapped with a passphrase). If you later add true wrapping,
+//   update unwrapFileKey() accordingly.
 
-function b64ToBytes(b64: string): Uint8Array {
-  // atob is available in browser. If SSR is added later, gate this.
+function base64ToBytes(b64: string): Uint8Array {
+  // atob/btoa are available in browser; if you ever run this in Node, swap to Buffer.
   const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
 }
 
-/**
- * Decrypt AES-GCM ciphertext to a Blob.
- * @param data  Blob | ArrayBuffer | Uint8Array of ciphertext
- * @param keyB64 base64-encoded raw AES key
- * @param ivB64  base64-encoded IV (12 bytes recommended)
- * @param mime   optional mime for output Blob
- */
-export async function decryptToBlob(
-  data: Blob | ArrayBuffer | Uint8Array,
-  keyB64: string,
-  ivB64: string,
-  mime?: string
-): Promise<Blob> {
-  let cipherBuf: ArrayBuffer;
-  if (data instanceof Blob) {
-    cipherBuf = await data.arrayBuffer();
-  } else if (data instanceof ArrayBuffer) {
-    cipherBuf = data;
-  } else if (data instanceof Uint8Array) {
-    cipherBuf = data.buffer;
-  } else {
-    throw new Error("Unsupported ciphertext payload for decryption");
+export async function unwrapFileKey(wrappedKeyB64: string): Promise<CryptoKey> {
+  // CURRENTLY: wrappedKeyB64 is just base64 of the raw 32-byte AES key.
+  // If you implement real wrapping with a user secret, do unwrap here and keep
+  // the function signature the same so the rest of the app doesn't change.
+  const raw = base64ToBytes(wrappedKeyB64);
+  if (raw.byteLength !== 32) {
+    // still import, but warn; AES-GCM keys should be 16/24/32 bytes. We expect 32.
+    console.warn("[unwrapFileKey] unexpected key length:", raw.byteLength);
   }
-
-  const keyRaw = b64ToBytes(keyB64);
-  const iv = b64ToBytes(ivB64);
-
-  const cryptoKey = await crypto.subtle.importKey(
+  return crypto.subtle.importKey(
     "raw",
-    keyRaw,
+    raw,
     { name: "AES-GCM" },
-    false,
-    ["decrypt"]
+    false,            // not extractable
+    ["decrypt"]       // only need decrypt for downloads
   );
+}
 
-  const plainBuf = await crypto.subtle.decrypt(
+export async function decryptAesGcm(
+  key: CryptoKey,
+  cipherAb: ArrayBuffer,   // [IV(12) | ciphertext+tag]
+): Promise<ArrayBuffer> {
+  const bytes = new Uint8Array(cipherAb);
+  if (bytes.byteLength < 13) {
+    throw new Error("Ciphertext too short");
+  }
+  const iv = bytes.slice(0, 12);
+  const data = bytes.slice(12);
+
+  const plain = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv },
-    cryptoKey,
-    cipherBuf
+    key,
+    data
   );
+  return plain; // ArrayBuffer
+}
 
-  return new Blob([plainBuf], { type: mime || "application/octet-stream" });
+// src/crypto/decrypt.ts
+// Decrypt AES-GCM content that was stored as: iv(12) || ciphertext+tag
+// Returns a Blob of the original file.
+
+export async function decryptAesGcmToBlob(
+  cipherBlob: Blob,
+  keyBytes: Uint8Array,
+  mime: string
+): Promise<Blob> {
+  const all = new Uint8Array(await cipherBlob.arrayBuffer());
+  if (all.length < 12 + 16) throw new Error("ciphertext too short");
+  const iv = all.slice(0, 12);
+  const data = all.slice(12);
+  const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["decrypt"]);
+  const plain = new Uint8Array(
+    await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data)
+  );
+  return new Blob([plain], { type: mime || "application/octet-stream" });
 }

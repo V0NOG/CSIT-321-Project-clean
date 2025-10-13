@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { ArrowRightIcon } from "../../icons";
 import { useFiles } from "../../hooks/useFiles";
-import { downloadDecryptedBlob } from "../../api/filesApi";
 import { unwrapFileKey } from "../../crypto/zk";
 import { decryptFileBytes } from "../../crypto/encrypt";
+import { downloadDecryptedBlob } from "../../api/filesApi";
 
 function fmtBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes < 0) return "—";
@@ -35,8 +35,19 @@ export default function RecentFileTable() {
   const canPrev = page > 1;
   const canNext = page < pageCount;
 
-  async function onDownload(id: string, name: string) {
-    await downloadDecryptedBlob(id, name, unwrapFileKey, decryptFileBytes);
+  async function onDownload(id: string, name: string, mime?: string) {
+    try {
+      const blob = await downloadDecryptedBlob({ _id: id, name, mime: mime || "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e:any) {
+      console.error(e);
+      alert(e?.message || "Download failed");
+    }
   }
 
   return (

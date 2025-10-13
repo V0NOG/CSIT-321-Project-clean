@@ -1,22 +1,31 @@
 import { useCallback, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
-  AudioIcon, DownloadIcon, FileIcon, FolderIcon, GridIcon, VideoIcon,
+  AudioIcon,
+  DownloadIcon,
+  FileIcon,
+  FolderIcon,
+  GridIcon,
+  VideoIcon,
 } from "../../icons";
 import FileCard from "./FileCard";
-import { encryptFileBlob } from "../../crypto/encrypt"; // assumes your existing file encryption returns { ciphertext, keyB64, ivB64 }
-import { initUpload, uploadCiphertext, setFileKey } from "../../api/filesApi";
+import { encryptWrapAndUpload } from "../../api/filesApi";
 import { categorize, fmtBytes, Category } from "../../utils/storage";
 import { useFiles } from "../../hooks/useFiles";
-import { wrapFileKey } from "../../crypto/zk";
 
 export default function AllMediaCard() {
   const { items: files } = useFiles({ page: 1, limit: 1000 });
   const [uploading, setUploading] = useState(false);
-  const [uploadCount, setUploadCount] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const [uploadCount, setUploadCount] = useState<{ done: number; total: number }>({
+    done: 0,
+    total: 0,
+  });
 
   const cardStats = useMemo(() => {
-    const buckets: Record<Category, { fileCount: number; totalBytes: number; icon: React.ReactNode; iconStyle: string }> = {
+    const buckets: Record<
+      Category,
+      { fileCount: number; totalBytes: number; icon: React.ReactNode; iconStyle: string }
+    > = {
       Images: { fileCount: 0, totalBytes: 0, icon: <FolderIcon className="size-5" />, iconStyle: "bg-success-500/[0.08] text-success-500" },
       Videos: { fileCount: 0, totalBytes: 0, icon: <VideoIcon className="size-6" />, iconStyle: "bg-theme-pink-500/[0.08] text-theme-pink-500" },
       Audios: { fileCount: 0, totalBytes: 0, icon: <AudioIcon className="size-6" />, iconStyle: "bg-blue-500/[0.08] text-blue-light-500" },
@@ -24,12 +33,15 @@ export default function AllMediaCard() {
       Documents: { fileCount: 0, totalBytes: 0, icon: <FileIcon className="size-6" />, iconStyle: "bg-warning-500/[0.08] text-warning-500" },
       Other: { fileCount: 0, totalBytes: 0, icon: <DownloadIcon className="size-6" />, iconStyle: "bg-theme-purple-500/[0.08] text-theme-purple-500" },
     };
+
     for (const f of files) {
       const cat = categorize(f.mime, f.name);
       buckets[cat].fileCount += 1;
       buckets[cat].totalBytes += f.size || 0;
     }
+
     const totalAll = files.reduce((n, f) => n + (f.size || 0), 0) || 1;
+
     return (Object.keys(buckets) as Category[]).map((cat) => {
       const b = buckets[cat];
       const percent = ((b.totalBytes / totalAll) * 100) || 0;
@@ -52,19 +64,11 @@ export default function AllMediaCard() {
       picker.accept = "*/*";
       picker.onchange = () => {
         const f = picker.files?.[0];
-        if (f) resolve(f); else reject(new Error("No file selected"));
+        if (f) resolve(f);
+        else reject(new Error("No file selected"));
       };
       picker.click();
     });
-  }
-
-  async function encryptAndUpload(file: File) {
-    const { fileId } = await initUpload({ name: file.name, size: file.size, mime: file.type || "application/octet-stream" });
-    const { ciphertext, keyB64, ivB64 } = await encryptFileBlob(file);
-    // zero-knowledge: wrap key locally, send only wrappedKey
-    const wrappedKeyB64 = await wrapFileKey(keyB64, ivB64);
-    await setFileKey(fileId, wrappedKeyB64);
-    await uploadCiphertext(fileId, ciphertext);
   }
 
   async function onUploadClick() {
@@ -72,10 +76,9 @@ export default function AllMediaCard() {
     setUploading(true);
     try {
       const file = await pickSingleFile();
-      await encryptAndUpload(file);
-      // live refresh for all widgets
+      await encryptWrapAndUpload(file);
       window.dispatchEvent(new CustomEvent("files:refresh"));
-    } catch (e: any) {
+    } catch (e:any) {
       console.error(e);
       alert(e.message || "Upload failed");
     } finally {
@@ -83,28 +86,36 @@ export default function AllMediaCard() {
     }
   }
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (!acceptedFiles?.length || uploading) return;
-    setUploading(true);
-    setUploadCount({ done: 0, total: acceptedFiles.length });
-    try {
-      for (let i = 0; i < acceptedFiles.length; i++) {
-        await encryptAndUpload(acceptedFiles[i]);
-        setUploadCount({ done: i + 1, total: acceptedFiles.length });
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      if (!acceptedFiles?.length || uploading) return;
+      setUploading(true);
+      setUploadCount({ done: 0, total: acceptedFiles.length });
+      try {
+        for (let i = 0; i < acceptedFiles.length; i++) {
+          await encryptWrapAndUpload(acceptedFiles[i]);
+          setUploadCount({ done: i + 1, total: acceptedFiles.length });
+        }
+        window.dispatchEvent(new CustomEvent("files:refresh"));
+      } catch (e: any) {
+        console.error(e);
+        alert(e?.message || "One or more uploads failed");
+      } finally {
+        setUploading(false);
+        setTimeout(() => setUploadCount({ done: 0, total: 0 }), 600);
       }
-      window.dispatchEvent(new CustomEvent("files:refresh"));
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "One or more uploads failed");
-    } finally {
-      setUploading(false);
-      setTimeout(() => setUploadCount({ done: 0, total: 0 }), 600);
-    }
-  }, [uploading]);
+    },
+    [uploading]
+  );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, multiple: true, noClick: true });
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    multiple: true,
+    noClick: true,
+  });
 
   return (
+    // ... rest of your component unchanged ...
     <div className="relative rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]" {...getRootProps()}>
       {isDragActive && (
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-brand-500/50 bg-brand-500/5 backdrop-blur-sm">
