@@ -1,7 +1,33 @@
-import FolderCard from "./FolderCard";
 import { Link } from "react-router";
+import FolderCard from "./FolderCard";
+import { useFiles } from "../../hooks/useFiles";
+import { categorize, fmtBytes } from "../../utils/storage";
+
+type Bucket = {
+  count: number;
+  bytes: number;
+};
 
 export default function AllFolders() {
+  const { items: files } = useFiles({ page: 1, limit: 1000, sort: "createdAt:desc" });
+
+  // Build buckets safely (no NaNs)
+  const buckets: Record<"Images" | "Documents" | "Apps" | "Other", Bucket> = {
+    Images: { count: 0, bytes: 0 },
+    Documents: { count: 0, bytes: 0 },
+    Apps: { count: 0, bytes: 0 },
+    Other: { count: 0, bytes: 0 },
+  };
+
+  for (const f of files || []) {
+    const size = Number(f.size) || 0;
+    const cat = categorize(f.mime, f.name); // "Images" | "Videos" | "Audios" | "Apps" | "Documents" | "Other"
+    if (cat === "Images") buckets.Images.bytes += size, buckets.Images.count += 1;
+    else if (cat === "Documents") buckets.Documents.bytes += size, buckets.Documents.count += 1;
+    else if (cat === "Apps") buckets.Apps.bytes += size, buckets.Apps.count += 1;
+    else buckets.Other.bytes += size, buckets.Other.count += 1; // Videos, Audios, Other → "Downloads" tile
+  }
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="px-4 py-4 sm:pl-6 sm:pr-4">
@@ -15,19 +41,11 @@ export default function AllFolders() {
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-500"
           >
             View All
-            <svg
-              className="fill-current"
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
+            <svg className="fill-current" width="20" height="20" viewBox="0 0 20 20" aria-hidden>
               <path
                 fillRule="evenodd"
                 clipRule="evenodd"
                 d="M17.4175 9.9986C17.4178 10.1909 17.3446 10.3832 17.198 10.53L12.2013 15.5301C11.9085 15.8231 11.4337 15.8233 11.1407 15.5305C10.8477 15.2377 10.8475 14.7629 11.1403 14.4699L14.8604 10.7472L3.33301 10.7472C2.91879 10.7472 2.58301 10.4114 2.58301 9.99715C2.58301 9.58294 2.91879 9.24715 3.33301 9.24715L14.8549 9.24715L11.1403 5.53016C10.8475 5.23717 10.8477 4.7623 11.1407 4.4695C11.4336 4.1767 11.9085 4.17685 12.2013 4.46984L17.1588 9.43049C17.3173 9.568 17.4175 9.77087 17.4175 9.99715C17.4175 9.99763 17.4175 9.99812 17.4175 9.9986Z"
-                fill=""
               />
             </svg>
           </Link>
@@ -35,10 +53,26 @@ export default function AllFolders() {
       </div>
       <div className="p-5 border-t border-gray-100 dark:border-gray-800 sm:p-6">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
-          <FolderCard title="Images" fileCount="345" size="26.40 GB" />
-          <FolderCard title="Documents" fileCount="130" size="26.40 GB" />
-          <FolderCard title="Apps" fileCount="130 Files" size="26.40 GB" />
-          <FolderCard title="Downloads" fileCount="345" size="26.40 GB" />
+          <FolderCard
+            title="Images"
+            fileCount={`${buckets.Images.count} ${buckets.Images.count === 1 ? "File" : "Files"}`}
+            size={fmtBytes(buckets.Images.bytes)}
+          />
+          <FolderCard
+            title="Documents"
+            fileCount={`${buckets.Documents.count} ${buckets.Documents.count === 1 ? "File" : "Files"}`}
+            size={fmtBytes(buckets.Documents.bytes)}
+          />
+          <FolderCard
+            title="Apps"
+            fileCount={`${buckets.Apps.count} ${buckets.Apps.count === 1 ? "File" : "Files"}`}
+            size={fmtBytes(buckets.Apps.bytes)}
+          />
+          <FolderCard
+            title="Downloads"
+            fileCount={`${buckets.Other.count} ${buckets.Other.count === 1 ? "File" : "Files"}`}
+            size={fmtBytes(buckets.Other.bytes)}
+          />
         </div>
       </div>
     </div>

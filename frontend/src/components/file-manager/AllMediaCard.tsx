@@ -15,8 +15,7 @@ import { categorize, fmtBytes, Category } from "../../utils/storage";
 import { useFiles } from "../../hooks/useFiles";
 
 export default function AllMediaCard() {
-  // pull files so stats are live
-  const { files } = useFiles({ page: 1, limit: 1000 });
+  const { items: files } = useFiles({ page: 1, limit: 1000, sort: "createdAt:desc" });
   const [uploading, setUploading] = useState(false);
   const [uploadCount, setUploadCount] = useState<{ done: number; total: number }>({
     done: 0,
@@ -36,22 +35,23 @@ export default function AllMediaCard() {
       Other: { fileCount: 0, totalBytes: 0, icon: <DownloadIcon className="size-6" />, iconStyle: "bg-theme-purple-500/[0.08] text-theme-purple-500" },
     };
 
-    for (const f of files) {
+    for (const f of files || []) {
+      const size = Number(f.size) || 0;
       const cat = categorize(f.mime, f.name);
       buckets[cat].fileCount += 1;
-      buckets[cat].totalBytes += f.size || 0;
+      buckets[cat].totalBytes += size;
     }
 
-    const totalAll = files.reduce((n, f) => n + (f.size || 0), 0) || 1;
+    const totalAll = Math.max(1, (files || []).reduce((n, f) => n + (Number(f.size) || 0), 0));
 
     return (Object.keys(buckets) as Category[]).map((cat) => {
       const b = buckets[cat];
-      const percent = ((b.totalBytes / totalAll) * 100) || 0;
+      const percent = Math.round((b.totalBytes / totalAll) * 100);
       return {
         title: cat,
-        usage: `${percent.toFixed(0)}% Used`,
+        usage: `${percent}% Used`,
         fileCount: b.fileCount,
-        storageUsed: fmtBytes(b.totalBytes),
+        storageUsed: fmtBytes(b.totalBytes || 0),
         icon: b.icon,
         iconStyle: b.iconStyle,
       };
@@ -74,18 +74,15 @@ export default function AllMediaCard() {
   }
 
   async function encryptAndUpload(file: File) {
-    // 1) init server-side record
     const { fileId } = await initUpload({
       name: file.name,
       size: file.size,
       mime: file.type || "application/octet-stream",
     });
 
-    // 2) encrypt locally to ciphertext (Blob or ArrayBuffer)
     const { ciphertext } = await encryptFileBlob(file);
-
-    // 3) upload ciphertext to server
-    await uploadCiphertext(fileId, ciphertext as Blob);
+    // RAW octet-stream upload to /files/upload/:id (matches your router)
+    await uploadCiphertext(fileId, ciphertext);
   }
 
   async function onUploadClick() {
@@ -94,7 +91,6 @@ export default function AllMediaCard() {
     try {
       const file = await pickSingleFile();
       await encryptAndUpload(file);
-      // tell any listeners (tables/cards) to refresh
       window.dispatchEvent(new CustomEvent("files:refresh"));
     } catch (e: any) {
       console.error(e);
@@ -153,7 +149,6 @@ export default function AllMediaCard() {
           </h3>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            {/* (optional) search box UI - not wired here; table handles searching */}
             <div className="relative">
               <button
                 className="absolute text-gray-500 -translate-y-1/2 left-4 top-1/2 dark:text-gray-400"

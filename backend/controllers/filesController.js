@@ -1,16 +1,14 @@
 // backend/controllers/filesController.js
 import mongoose from "mongoose";
 import File from "../models/File.js";
-import path from "node:path";
 
+// ---------- helpers ----------
 function parseSort(sortStr) {
-  // "createdAt:desc" -> { createdAt: -1 }
   if (!sortStr) return { createdAt: -1 };
   const [field, dir = "desc"] = String(sortStr).split(":");
   return { [field]: dir.toLowerCase() === "asc" ? 1 : -1 };
 }
 
-// Server-side categorize similar to frontend utils
 function buildTypeFilter(type) {
   if (!type || type === "all") return {};
   const t = String(type).toLowerCase();
@@ -35,7 +33,6 @@ function buildTypeFilter(type) {
   }
 
   if (["other", "others"].includes(t)) {
-    // "Other" = not image/video/audio/document/apps (approx)
     const docExts = ["pdf","doc","docx","ppt","pptx","xls","xlsx","txt","rtf","md","csv"];
     const appExts = ["zip", "rar", "7z", "apk", "dmg", "exe", "msi"];
     return {
@@ -61,9 +58,11 @@ function getBucket() {
   return new mongoose.mongo.GridFSBucket(db, { bucketName: "cipherfiles" });
 }
 
+// ---------- routes ----------
+
 // GET /api/files?page=&limit=&q=&type=&sort=
 export async function listFiles(req, res) {
-  const userId = req.user.id;
+  const userId = req.user.id; // <-- we consistently use "owner"
   const page = Math.max(1, parseInt(req.query.page ?? "1", 10) || 1);
   const limit = Math.min(2000, parseInt(req.query.limit ?? "20", 10) || 20);
   const q = (req.query.q || "").trim();
@@ -91,7 +90,7 @@ export async function listFiles(req, res) {
 export async function initUpload(req, res) {
   const userId = req.user.id;
   const { name, size, mime } = req.body || {};
-  if (!name || !Number.isFinite(size)) {
+  if (!name || !Number.isFinite(Number(size))) {
     return res.status(400).json({ error: "name and size are required" });
   }
 
@@ -100,60 +99,81 @@ export async function initUpload(req, res) {
     name,
     size: Number(size),
     mime: mime || "application/octet-stream",
+    status: "pending",
+    // NOTE: do NOT set dropboxPath here (avoids the unique-index null duplicate issue)
   });
 
   res.status(201).json({ fileId: doc._id.toString() });
 }
 
 // POST /api/files/upload/:id (Content-Type: application/octet-stream)
-// body: raw ciphertext stream -> GridFS
+// body: raw ciphertext bytes
 export async function uploadCiphertext(req, res) {
-  const userId = req.user.id;
-  const fileId = req.params.id;
-  const doc = await File.findOne({ _id: fileId, owner: userId });
-  if (!doc) return res.status(404).json({ error: "File not found" });
+  try {
+    const userId = req.user.id;
+    const fileId = req.params.id;
 
-  if (doc?.storage?.gridFsId) {
-    return res.status(409).json({ error: "Already uploaded" });
-  }
+    const meta = await File.findOne({ _id: fileId, owner: userId });
+    if (!meta) return res.status(404).json({ error: "File not found" });
 
-  const bucket = getBucket();
-  const filename = `${fileId}-${path.basename(doc.name)}`;
-
-  const uploadStream = bucket.openUploadStream(filename, {
-    metadata: { owner: userId, fileId, mime: doc.mime },
-    contentType: "application/octet-stream",
-  });
-
-  req.pipe(uploadStream)
-    .on("error", (err) => {
-      console.error("GridFS upload error:", err);
-      res.status(500).json({ error: "Upload failed" });
-    })
-    .on("finish", async (file) => {
-      // file contains { _id, length, filename, ... }
-      doc.storage = {
-        gridFsId: file._id,
-        length: file.length,
-        filename: file.filename,
-      };
-      await doc.save();
-      res.json({ ok: true, bytes: file.length });
+    const bucket = getBucket();
+    const uploadStream = bucket.openUploadStream(meta.name, {
+      contentType: "application/octet-stream",
+      metadata: {
+        owner: String(userId),
+        mime: meta.mime,
+        logicalSize: meta.size,
+      },
     });
+
+    uploadStream.on("error", (err) => {
+      console.error("[gridfs] upload error:", err);
+      return res.status(500).json({ error: "Upload failed" });
+    });
+
+    uploadStream.on("finish", async () => {
+      try {
+        await File.updateOne(
+          { _id: fileId },
+          {
+            $set: {
+              status: "ready",
+              storage: {
+                ...(meta.storage || {}),
+                gridFsId: uploadStream.id, // <-- store where download expects it
+              },
+            },
+          }
+        );
+        return res.status(200).json({ ok: true });
+      } catch (e) {
+        console.error("[upload finish] update meta failed:", e);
+        return res.status(500).json({ error: "Upload metadata update failed" });
+      }
+    });
+
+    // pipe raw body to GridFS
+    uploadStream.end(req.body);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "Unexpected upload error" });
+  }
 }
 
-// GET /api/files/:id/download -> streams ciphertext back
+// GET /api/files/:id/download
 export async function downloadFile(req, res) {
   const userId = req.user.id;
   const fileId = req.params.id;
+
   const doc = await File.findOne({ _id: fileId, owner: userId });
-  if (!doc || !doc?.storage?.gridFsId) return res.status(404).json({ error: "Not found" });
+  const gridId = doc?.storage?.gridFsId;
+  if (!doc || !gridId) return res.status(404).json({ error: "Not found" });
 
   const bucket = getBucket();
   res.setHeader("Content-Type", "application/octet-stream");
   res.setHeader("Content-Disposition", `attachment; filename="${doc.name}"`);
 
-  const readStream = bucket.openDownloadStream(doc.storage.gridFsId);
+  const readStream = bucket.openDownloadStream(gridId);
   readStream.on("error", (err) => {
     console.error("GridFS download error:", err);
     if (!res.headersSent) res.status(500).end("Download error");
@@ -161,17 +181,20 @@ export async function downloadFile(req, res) {
   readStream.pipe(res);
 }
 
-// Optional: DELETE /api/files/:id
+// DELETE /api/files/:id
 export async function deleteFile(req, res) {
   const userId = req.user.id;
   const fileId = req.params.id;
+
   const doc = await File.findOne({ _id: fileId, owner: userId });
   if (!doc) return res.status(404).json({ error: "Not found" });
 
   const bucket = getBucket();
-  if (doc.storage?.gridFsId) {
-    try { await bucket.delete(doc.storage.gridFsId); } catch (e) { /* ignore */ }
+  const gridId = doc.storage?.gridFsId;
+  if (gridId) {
+    try { await bucket.delete(gridId); } catch { /* ignore */ }
   }
+
   await doc.deleteOne();
   res.json({ ok: true });
 }
