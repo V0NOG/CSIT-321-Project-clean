@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import { ArrowRightIcon } from "../../icons";
 import { useFiles } from "../../hooks/useFiles";
 import { downloadDecryptedBlob } from "../../api/filesApi";
+import { unwrapFileKey } from "../../crypto/zk";
+import { decryptFileBytes } from "../../crypto/encrypt";
 
 function fmtBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes < 0) return "—";
@@ -33,14 +35,8 @@ export default function RecentFileTable() {
   const canPrev = page > 1;
   const canNext = page < pageCount;
 
-  async function onDownload(id: string, name: string, mime?: string) {
-    const plainBlob = await downloadDecryptedBlob(id, mime);
-    const url = URL.createObjectURL(plainBlob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function onDownload(id: string, name: string) {
+    await downloadDecryptedBlob(id, name, unwrapFileKey, decryptFileBytes);
   }
 
   return (

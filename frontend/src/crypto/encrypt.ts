@@ -16,3 +16,15 @@ export async function encryptFileBlob(blob: Blob) {
     iv: Array.from(iv), // store alongside metadata if needed
   };
 }
+
+export async function decryptFileBytes(
+  cipher: ArrayBuffer,
+  keyB64: string,
+  ivB64: string
+): Promise<Blob> {
+  const keyRaw = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
+  const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("raw", keyRaw, "AES-GCM", false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher);
+  return new Blob([plain]);
+}

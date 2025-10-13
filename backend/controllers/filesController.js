@@ -98,15 +98,15 @@ export async function initUpload(req, res) {
 export async function setFileKey(req, res) {
   const userId = req.user.id;
   const fileId = req.params.id;
-  const { keyB64, ivB64 } = req.body || {};
-  if (!keyB64 || !ivB64) return res.status(400).json({ error: "keyB64 and ivB64 are required" });
+  const { wrappedKeyB64 } = req.body || {};
+  if (!wrappedKeyB64) return res.status(400).json({ error: "wrappedKeyB64 is required" });
 
   const file = await File.findOne({ _id: fileId, owner: userId }).lean();
   if (!file) return res.status(404).json({ error: "File not found" });
 
   await FileKey.findOneAndUpdate(
     { owner: userId, file: file._id },
-    { $set: { keyB64, ivB64 } },
+    { $set: { wrappedKeyB64 } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
@@ -121,7 +121,7 @@ export async function getFileKey(req, res) {
   const doc = await FileKey.findOne({ owner: userId, file: fileId }).lean();
   if (!doc) return res.status(404).json({ error: "Key not found" });
 
-  res.json({ keyB64: doc.keyB64, ivB64: doc.ivB64 });
+  res.json({ wrappedKeyB64: doc.wrappedKeyB64 });
 }
 
 // ---------- UPLOAD CIPHERTEXT → DROPBOX ----------
@@ -132,15 +132,15 @@ export async function uploadCiphertext(req, res) {
     const meta = await File.findOne({ _id: fileId, owner: userId });
     if (!meta) return res.status(404).json({ error: "File not found" });
 
-    // req.body is a Buffer because route uses express.raw({ type: 'application/octet-stream' })
     const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
     const path = dropboxPathFor(userId, fileId, meta.name);
 
     await uploadToDropbox(path, bytes);
 
+    // DOT-SET so we don't clobber storage object
     await File.updateOne(
       { _id: fileId },
-      { $set: { status: "ready", storage: { dropboxPath: path } } }
+      { $set: { status: "ready", "storage.dropboxPath": path } }
     );
 
     res.json({ ok: true });

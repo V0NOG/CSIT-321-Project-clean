@@ -37,11 +37,12 @@ export async function initUpload(meta: { name: string; size: number; mime: strin
   return res.json(); // { fileId }
 }
 
-export async function setFileKey(fileId: string, keyB64: string, ivB64: string) {
+// store wrapped key only
+export async function setFileKey(fileId: string, wrappedKeyB64: string) {
   const res = await fetch(`${BASE}/files/${fileId}/key`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeader() },
-    body: JSON.stringify({ keyB64, ivB64 }),
+    body: JSON.stringify({ wrappedKeyB64 }),
   });
   if (!res.ok) throw new Error(`Failed to save key (${res.status})`);
   return res.json();
@@ -52,14 +53,11 @@ export async function getFileKey(fileId: string) {
     headers: { ...authHeader() },
   });
   if (!res.ok) throw new Error("Key not found");
-  return res.json(); // { keyB64, ivB64 }
+  return res.json(); // { wrappedKeyB64 }
 }
 
-// Upload ciphertext (Blob/ArrayBuffer) as raw octet-stream
 export async function uploadCiphertext(fileId: string, blob: Blob | ArrayBuffer) {
-  const body =
-    blob instanceof Blob ? await blob.arrayBuffer() : blob;
-
+  const body = blob instanceof Blob ? await blob.arrayBuffer() : blob;
   const res = await fetch(`${BASE}/files/upload/${fileId}`, {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream", ...authHeader() },
@@ -69,7 +67,6 @@ export async function uploadCiphertext(fileId: string, blob: Blob | ArrayBuffer)
   return res.json();
 }
 
-// Download ciphertext
 export async function downloadFile(fileId: string) {
   const res = await fetch(`${BASE}/files/${fileId}/download`, {
     headers: { ...authHeader() },
@@ -78,14 +75,20 @@ export async function downloadFile(fileId: string) {
   return await res.arrayBuffer();
 }
 
-// Helpers for decrypt-on-download
-export async function downloadDecryptedBlob(fileId: string, name: string, decryptFn: (bytes: ArrayBuffer, keyB64: string, ivB64: string) => Promise<Blob>) {
-  const [{ keyB64, ivB64 }, cipher] = await Promise.all([
+// decrypt-on-download helper (pass a decryptFn)
+export async function downloadDecryptedBlob(
+  fileId: string,
+  name: string,
+  unwrapFn: (wrappedKeyB64: string) => Promise<{ keyB64: string; ivB64: string }>,
+  decryptFn: (bytes: ArrayBuffer, keyB64: string, ivB64: string) => Promise<Blob>
+) {
+  const [{ wrappedKeyB64 }, cipher] = await Promise.all([
     getFileKey(fileId),
     downloadFile(fileId),
   ]);
+  const { keyB64, ivB64 } = await unwrapFn(wrappedKeyB64);
   const plainBlob = await decryptFn(cipher, keyB64, ivB64);
-  // trigger browser save
+
   const url = URL.createObjectURL(plainBlob);
   const a = document.createElement("a");
   a.href = url;

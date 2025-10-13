@@ -1,3 +1,8 @@
+// only 3 changes vs your latest:
+// 1) read { items } from hook
+// 2) add a keyed wrapper to force rerender on change
+// 3) render empty state nicely
+
 import { useMemo } from "react";
 import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
@@ -13,9 +18,7 @@ export default function StorageDetailsChart() {
 
   const { labels, series, totalBytes, legendMap } = useMemo(() => {
     const order: Category[] = ["Images", "Videos", "Audios", "Documents", "Apps", "Other"];
-    const byteMap: Record<Category, number> = {
-      Images: 0, Videos: 0, Audios: 0, Documents: 0, Apps: 0, Other: 0,
-    };
+    const byteMap: Record<Category, number> = { Images: 0, Videos: 0, Audios: 0, Documents: 0, Apps: 0, Other: 0 };
     for (const f of files) {
       const cat = categorize(f.mime, f.name);
       byteMap[cat] += Number(f.size) || 0;
@@ -74,8 +77,10 @@ export default function StorageDetailsChart() {
     },
   }), [labels, totalBytes, legendMap, files.length, isDarkMode]);
 
+  const forceKey = `${files.length}-${totalBytes}`;
+
   return (
-    <div className="px-4 pt-6 pb-6 bg-white border border-gray-200 rounded-2xl dark:border-gray-800 dark:bg-gray-900 sm:px-6">
+    <div className="px-4 pt-6 pb-6 bg-white border border-gray-200 rounded-2xl dark:border-gray-800 dark:bg-gray-900 sm:px-6" key={forceKey}>
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Storage Details</h3>
@@ -86,9 +91,7 @@ export default function StorageDetailsChart() {
       </div>
 
       {files.length === 0 ? (
-        <div className="py-10 text-sm text-center text-gray-500 dark:text-gray-400">
-          No files yet.
-        </div>
+        <div className="py-10 text-sm text-center text-gray-500 dark:text-gray-400">No files yet.</div>
       ) : (
         <div className="flex justify-center mx-auto" id="chartDarkStyle">
           <Chart options={options} series={series} type="donut" width="400" />
