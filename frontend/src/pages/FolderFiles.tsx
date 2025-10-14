@@ -1,5 +1,6 @@
+// frontend/src/pages/FolderFiles.tsx
 import { useMemo } from "react";
-import { useParams } from "react-router";
+import { useParams } from "react-router-dom";
 import PageMeta from "../components/common/PageMeta";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import RecentFileTable from "../components/file-manager/RecentFileTable";

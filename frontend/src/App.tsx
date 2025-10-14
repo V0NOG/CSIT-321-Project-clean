@@ -1,3 +1,4 @@
+// frontend/src/App.tsx
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
@@ -19,6 +20,7 @@ import CodeGeneratorPage from "./pages/Ai/CodeGenerator";
 import VideoGeneratorPage from "./pages/Ai/VideoGenerator";
 import FolderFiles from "./pages/FolderFiles";
 import TotpSetup from "./pages/Security/TotpSetup";
+import SharedWithMe from "./pages/SharedWithMe";
 
 export default function App() {
   return (
@@ -37,26 +39,28 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index path="/" element={<Home />} />
+          {/* use either index or path, not both */}
+          <Route index element={<Home />} />
           <Route path="/security/mfa" element={<TotpSetup />} />
           <Route path="/profile" element={<UserProfiles />} />
           <Route path="/blank" element={<Blank />} />
           <Route path="/file-manager" element={<FileManager />} />
           <Route path="/file-manager/folder/:bucket" element={<FolderFiles />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/shared" element={<SharedWithMe />} />
         </Route>
 
         {/* Fallback Route */}
         <Route path="*" element={<NotFound />} />
 
         {/* Alternative Layout - for special pages */}
-          <Route element={<AlternativeLayout />}>
-            {/* AI Generator */}
-            <Route path="/text-generator" element={<TextGeneratorPage />} />
-            <Route path="/image-generator" element={<ImageGeneratorPage />} />
-            <Route path="/code-generator" element={<CodeGeneratorPage />} />
-            <Route path="/video-generator" element={<VideoGeneratorPage />} />
-          </Route>
+        <Route element={<AlternativeLayout />}>
+          {/* AI Generator */}
+          <Route path="/text-generator" element={<TextGeneratorPage />} />
+          <Route path="/image-generator" element={<ImageGeneratorPage />} />
+          <Route path="/code-generator" element={<CodeGeneratorPage />} />
+          <Route path="/video-generator" element={<VideoGeneratorPage />} />
+        </Route>
       </Routes>
     </Router>
   );

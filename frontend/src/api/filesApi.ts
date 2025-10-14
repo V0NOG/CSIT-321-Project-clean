@@ -114,6 +114,17 @@ export async function getFileKey(fileId: string): Promise<{ wrappedKeyB64: strin
   return res.data;
 }
 
+export async function listSharedFiles() {
+  const res = await axios.get("http://localhost:5050/api/files/shared", {
+    headers: authHeader(),
+    withCredentials: true,
+  });
+  const data = res.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+}
+
 /**
  * Full download: fetch wrapped key, unwrap with KEK, download ciphertext, decrypt to Blob.
  */

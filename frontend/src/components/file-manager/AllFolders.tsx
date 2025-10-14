@@ -1,7 +1,10 @@
+// frontend/src/components/file-manager/AllFolders.tsx
 import { Link } from "react-router";
+import { useEffect, useMemo, useState } from "react";
 import FolderCard from "./FolderCard";
 import { useFiles } from "../../hooks/useFiles";
 import { categorize, fmtBytes } from "../../utils/storage";
+import { listSharedFiles } from "../../api/filesApi";
 
 type Bucket = {
   count: number;
@@ -9,24 +12,68 @@ type Bucket = {
 };
 
 export default function AllFolders() {
+  // Your own files
   const { items: files } = useFiles({ page: 1, limit: 1000, sort: "createdAt:desc" });
 
-  // Build buckets safely (no NaNs)
-  const buckets: Record<"Images" | "Documents" | "Apps" | "Other", Bucket> = {
-    Images: { count: 0, bytes: 0 },
-    Documents: { count: 0, bytes: 0 },
-    Apps: { count: 0, bytes: 0 },
-    Other: { count: 0, bytes: 0 },
-  };
+  // Shared (accepted) copies fetched from /api/files/shared
+  const [shared, setShared] = useState<Bucket>({ count: 0, bytes: 0 });
+  const [sharedLoading, setSharedLoading] = useState(false);
 
-  for (const f of files || []) {
-    const size = Number(f.size) || 0;
-    const cat = categorize(f.mime, f.name); // "Images" | "Videos" | "Audios" | "Apps" | "Documents" | "Other"
-    if (cat === "Images") buckets.Images.bytes += size, buckets.Images.count += 1;
-    else if (cat === "Documents") buckets.Documents.bytes += size, buckets.Documents.count += 1;
-    else if (cat === "Apps") buckets.Apps.bytes += size, buckets.Apps.count += 1;
-    else buckets.Other.bytes += size, buckets.Other.count += 1; // Videos, Audios, Other → "Downloads" tile
+  async function loadShared() {
+    try {
+      setSharedLoading(true);
+      const res = await listSharedFiles(); // returns { items } or array
+      const items = (res?.items ?? res ?? []) as Array<{ size?: number }>;
+      let count = 0;
+      let bytes = 0;
+      for (const f of items) {
+        count += 1;
+        bytes += Number(f?.size) || 0;
+      }
+      setShared({ count, bytes });
+    } catch {
+      setShared({ count: 0, bytes: 0 });
+    } finally {
+      setSharedLoading(false);
+    }
   }
+
+  useEffect(() => {
+    loadShared();
+    // refresh when uploads or accept/decline fire a files:refresh event
+    const onRefresh = () => loadShared();
+    window.addEventListener("files:refresh", onRefresh);
+    return () => window.removeEventListener("files:refresh", onRefresh);
+  }, []);
+
+  // Build buckets (own files only; shared is its own tile)
+  const buckets = useMemo(() => {
+    const out: Record<"Images" | "Documents" | "Apps" | "Other", Bucket> = {
+      Images: { count: 0, bytes: 0 },
+      Documents: { count: 0, bytes: 0 },
+      Apps: { count: 0, bytes: 0 },
+      Other: { count: 0, bytes: 0 },
+    };
+    for (const f of files || []) {
+      const size = Number(f.size) || 0;
+      const cat = categorize(f.mime, f.name); // "Images" | "Videos" | "Audios" | "Apps" | "Documents" | "Other"
+      if (cat === "Images") {
+        out.Images.bytes += size;
+        out.Images.count += 1;
+      } else if (cat === "Documents") {
+        out.Documents.bytes += size;
+        out.Documents.count += 1;
+      } else if (cat === "Apps") {
+        out.Apps.bytes += size;
+        out.Apps.count += 1;
+      } else {
+        // Videos, Audios, Other → "Downloads" tile
+        out.Other.bytes += size;
+        out.Other.count += 1;
+      }
+    }
+    return out;
+  }, [files]);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -51,8 +98,9 @@ export default function AllFolders() {
           </Link>
         </div>
       </div>
+
       <div className="p-5 border-t border-gray-100 dark:border-gray-800 sm:p-6">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
           <FolderCard
             title="Images"
             fileCount={`${buckets.Images.count}`}
@@ -76,6 +124,12 @@ export default function AllFolders() {
             fileCount={`${buckets.Other.count}`}
             size={fmtBytes(buckets.Other.bytes)}
             to="/file-manager/folder/downloads"
+          />
+          <FolderCard
+            title="Shared"
+            fileCount={sharedLoading ? "…" : `${shared.count}`}
+            size={sharedLoading ? "…" : fmtBytes(shared.bytes)}
+            to="/shared"
           />
         </div>
       </div>

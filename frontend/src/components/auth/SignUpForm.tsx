@@ -1,5 +1,6 @@
+// frontend/src/components/auth/SignUpForm.tsx
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
@@ -10,9 +11,11 @@ import Button from "../ui/button/Button";
 import GoogleAuthButton from "./GoogleAuthButton";
 
 export default function SignUpForm() {
+  const navigate = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
-  const [alert, setAlert] = useState<{ kind: "success"|"warning"|"error"|"info"; msg: string } | null>(null);
+  const [alert, setAlert] = useState<{ kind: "success" | "warning" | "error" | "info"; msg: string } | null>(null);
 
   const [formData, setFormData] = useState({
     fname: "",
@@ -21,24 +24,32 @@ export default function SignUpForm() {
     password: "",
   });
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setAlert(null);
-    try {
-      const res = await axios.post("http://localhost:5050/api/auth/register", {
-        firstName: formData.fname,
-        lastName: formData.lname,
-        email: formData.email,
-        password: formData.password,
-      }, { withCredentials: true });
 
-      // Go to sign-in (or directly log in if you prefer)
-      window.location.href = "/signin";
-    } catch (err: any) {
-      const apiMsg =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        "Signup failed";
+    if (!isChecked) {
+      setAlert({ kind: "warning", msg: "Please accept the Terms and Privacy Policy to continue." });
+      return;
+    }
+
+    try {
+      await axios.post(
+        "http://localhost:5050/api/auth/register",
+        {
+          firstName: formData.fname,
+          lastName: formData.lname,
+          email: formData.email,
+          password: formData.password,
+        },
+        { withCredentials: true }
+      );
+
+      // Navigate to sign-in after successful registration
+      navigate("/signin", { replace: true });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string; message?: string } } };
+      const apiMsg = e?.response?.data?.error || e?.response?.data?.message || "Signup failed";
       setAlert({ kind: "error", msg: apiMsg });
     }
   };
@@ -60,9 +71,7 @@ export default function SignUpForm() {
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
               Sign Up
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Create your account
-            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Create your account</p>
           </div>
 
           {alert && (
@@ -79,7 +88,9 @@ export default function SignUpForm() {
               <div className="space-y-5">
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-1">
-                    <Label>First Name<span className="text-error-500">*</span></Label>
+                    <Label>
+                      First Name<span className="text-error-500">*</span>
+                    </Label>
                     <Input
                       type="text"
                       placeholder="Enter your first name"
@@ -90,7 +101,9 @@ export default function SignUpForm() {
                   </div>
 
                   <div className="sm:col-span-1">
-                    <Label>Last Name<span className="text-error-500">*</span></Label>
+                    <Label>
+                      Last Name<span className="text-error-500">*</span>
+                    </Label>
                     <Input
                       type="text"
                       placeholder="Enter your last name"
@@ -102,7 +115,9 @@ export default function SignUpForm() {
                 </div>
 
                 <div>
-                  <Label>Email<span className="text-error-500">*</span></Label>
+                  <Label>
+                    Email<span className="text-error-500">*</span>
+                  </Label>
                   <Input
                     type="email"
                     placeholder="Enter your email"
@@ -113,7 +128,9 @@ export default function SignUpForm() {
                 </div>
 
                 <div>
-                  <Label>Password<span className="text-error-500">*</span></Label>
+                  <Label>
+                    Password<span className="text-error-500">*</span>
+                  </Label>
                   <div className="relative">
                     <Input
                       placeholder="Enter your password"
@@ -139,19 +156,18 @@ export default function SignUpForm() {
                   <Checkbox className="w-5 h-5" checked={isChecked} onChange={setIsChecked} />
                   <p className="inline-block font-normal text-gray-500 dark:text-gray-400">
                     By creating an account you agree to the{" "}
-                    <span className="text-gray-800 dark:text-white/90">Terms</span>{" "}
-                    and our{" "}
+                    <span className="text-gray-800 dark:text-white/90">Terms</span> and our{" "}
                     <span className="text-gray-800 dark:text-white">Privacy Policy</span>
                   </p>
                 </div>
 
                 <div className="grid gap-3">
-                  <Button type="submit" size="sm" className="w-full">Sign Up</Button>
+                  <Button type="submit" size="sm" className="w-full" disabled={!isChecked}>
+                    Sign Up
+                  </Button>
 
                   {/* Google button – doubles as sign up if user doesn't exist */}
-                  <GoogleAuthButton
-                    onError={(msg) => setAlert({ kind: "error", msg })}
-                  />
+                  <GoogleAuthButton onError={(msg) => setAlert({ kind: "error", msg })} />
                 </div>
               </div>
             </form>
