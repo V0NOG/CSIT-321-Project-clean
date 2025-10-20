@@ -1,3 +1,4 @@
+// frontend/src/context/SidebarContext.tsx
 import { createContext, useContext, useState, useEffect } from "react";
 
 type SidebarContextType = {

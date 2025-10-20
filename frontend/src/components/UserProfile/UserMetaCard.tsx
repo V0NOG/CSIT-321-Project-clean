@@ -1,3 +1,4 @@
+// frontend/src/components/UserProfile/UserMetaCard.tsx
 import { useAuth } from "../../context/AuthContext";
 
 export default function UserMetaCard() {

@@ -1,4 +1,4 @@
-// frontend/src/pages/Security/TotpSetup.tsx
+// frontend/src/pages/Security/TotpSetup.tsx (or wherever your Totp page is)
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";

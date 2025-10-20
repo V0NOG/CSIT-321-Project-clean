@@ -1,3 +1,4 @@
+// frontend/src/components/file-manager/FileCard.tsx
 interface FileCardProps {
   icon: React.ReactNode;
   title: string;

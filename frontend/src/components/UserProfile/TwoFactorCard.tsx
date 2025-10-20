@@ -1,3 +1,4 @@
+// frontend/src/components/UserProfile/TwoFactorCard.tsx
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";

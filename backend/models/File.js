@@ -1,17 +1,26 @@
 // backend/models/File.js
 import mongoose from "mongoose";
 
-const fileSchema = new mongoose.Schema(
+const FileSchema = new mongoose.Schema(
   {
-    owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true, required: true },
     name: { type: String, required: true },
-    mime: { type: String },
-    size: { type: Number, default: 0 },
+    size: { type: Number, required: true }, // original plaintext size
+    mime: { type: String, default: "application/octet-stream" },
     isSharedCopy: { type: Boolean, default: false },
-    // any other fields you already had (path, encryption, etc.)
+
+    // Where the ciphertext lives in Dropbox
+    dropboxPath: { type: String }, // e.g. /Apps/MyApp/<userId>/<fileId>.bin
+
+    // Encryption metadata (client-side AES-GCM)
+    storage: {
+      ivB64: { type: String }, // 12-byte IV, base64
+    },
+
+    // Optional status
+    status: { type: String, default: "init" }, // init | ready
   },
   { timestamps: true }
 );
 
-// Export default, but we will *import it as FileModel* to avoid name clash
-export default mongoose.model("File", fileSchema);
+export default mongoose.model("File", FileSchema);

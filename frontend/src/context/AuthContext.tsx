@@ -1,3 +1,4 @@
+// frontend/src/context/AuthContext.tsx
 import { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 

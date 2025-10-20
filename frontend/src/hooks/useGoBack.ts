@@ -1,3 +1,4 @@
+// frontend/src/hooks/useGoBack.ts
 import { useNavigate } from "react-router";
 
 const useGoBack = () => {

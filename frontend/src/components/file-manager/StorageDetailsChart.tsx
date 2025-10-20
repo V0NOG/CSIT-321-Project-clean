@@ -1,7 +1,4 @@
-// only 3 changes vs your latest:
-// 1) read { items } from hook
-// 2) add a keyed wrapper to force rerender on change
-// 3) render empty state nicely
+// frontend/src/components/file-manager/StorageDetailsChart.tsx
 
 import { useMemo } from "react";
 import Chart from "react-apexcharts";

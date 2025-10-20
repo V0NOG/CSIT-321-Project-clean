@@ -1,3 +1,4 @@
+// backend/routes/user.js
 import express from "express";
 import User from "../models/User.js";
 import { verifyToken } from "../middleware/auth.js";

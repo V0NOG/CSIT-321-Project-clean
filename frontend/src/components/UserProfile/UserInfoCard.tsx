@@ -1,3 +1,4 @@
+// frontend/src/components/UserProfile/UserInfoCard.tsx
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useModal } from "../../hooks/useModal";

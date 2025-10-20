@@ -1,3 +1,4 @@
+// frontend/src/components/file-manager/AllMediaCard.tsx
 import { useCallback, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {

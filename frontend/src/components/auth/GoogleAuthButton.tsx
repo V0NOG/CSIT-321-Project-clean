@@ -1,3 +1,4 @@
+// frontend/src/components/auth/GoogleAuthButton.tsx
 import { useEffect, useRef } from "react";
 import axios from "axios";
 
