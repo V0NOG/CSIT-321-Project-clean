@@ -1,6 +1,6 @@
+import "dotenv/config";
 import express from "express";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -13,9 +13,6 @@ import fileRoutes from "./routes/files.js";
 import aclRoutes from "./routes/acl.js";
 import analyticsRoutes from "./routes/analytics.js";
 import sharesRouter from "./routes/shares.js";
-
-dotenv.config();
-
 const app = express();
 
 // --- security & parsing ---
@@ -41,7 +38,7 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.get("/", (_req, res) => res.send("API is working ✅"));
+app.get("/", (_req, res) => res.send("API is working"));
 
 // routes
 app.use("/api/auth", authRoutes);
@@ -65,9 +62,9 @@ app.use((err, _req, res, _next) => {
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log("✅ Connected to MongoDB");
+    console.log("Connected to MongoDB");
     app.listen(process.env.PORT, "0.0.0.0", () =>
-      console.log(`🚀 Server running on port ${process.env.PORT}`)
+      console.log(`Server running on port ${process.env.PORT}`)
     );
   })
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+  .catch((err) => console.error("MongoDB connection error:", err));
