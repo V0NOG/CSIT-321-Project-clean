@@ -13,3 +13,5 @@ build/
 # misc
 .DS_Store
 *.log
+
+backend/package-lock.json
