@@ -10,10 +10,14 @@ export default function TopChannel() {
 
   useEffect(() => {
     (async () => {
-      const s = await fetchAnalyticsSummary();
-      const map = s.topActions30d || {};
-      const order = ["upload","download","acl:upsert","acl:remove","login"];
-      setRows(order.map(k => ({ label: k, value: map[k] || 0 })));
+      try {
+        const s = await fetchAnalyticsSummary();
+        const map = s.topActions30d || {};
+        const order = ["upload","download","acl:upsert","acl:remove","login"];
+        setRows(order.map(k => ({ label: k, value: map[k] || 0 })));
+      } catch {
+        // silently ignore
+      }
     })();
   }, []);
 

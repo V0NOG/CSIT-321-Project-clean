@@ -1,15 +1,22 @@
 // backend/services/userdropbox.js
-// Dropbox operations using a specific user's OAuth tokens (not the app-level tokens).
 import { Readable } from "node:stream";
+import { loadCredential } from "./credentialLoader.js";
 
-const APP_KEY = process.env.DROPBOX_APP_KEY || "";
-const APP_SECRET = process.env.DROPBOX_APP_SECRET || "";
 const REDIRECT_URI = `${process.env.BACKEND_URL || "http://localhost:5050"}/api/connectors/dropbox/callback`;
 
-export function getAuthUrl(stateToken) {
+async function getCreds() {
+  const [appKey, appSecret] = await Promise.all([
+    loadCredential("DROPBOX_APP_KEY"),
+    loadCredential("DROPBOX_APP_SECRET"),
+  ]);
+  return { appKey, appSecret };
+}
+
+export async function getAuthUrl(stateToken) {
+  const { appKey } = await getCreds();
   const params = new URLSearchParams({
     response_type: "code",
-    client_id: APP_KEY,
+    client_id: appKey,
     redirect_uri: REDIRECT_URI,
     state: stateToken,
     token_access_type: "offline",
@@ -18,11 +25,12 @@ export function getAuthUrl(stateToken) {
 }
 
 export async function exchangeCode(code) {
+  const { appKey, appSecret } = await getCreds();
   const body = new URLSearchParams({
     code,
     grant_type: "authorization_code",
-    client_id: APP_KEY,
-    client_secret: APP_SECRET,
+    client_id: appKey,
+    client_secret: appSecret,
     redirect_uri: REDIRECT_URI,
   });
   const res = await fetch("https://api.dropboxapi.com/oauth2/token", {
@@ -34,7 +42,7 @@ export async function exchangeCode(code) {
     const t = await res.text();
     throw new Error(`[dropbox exchange] ${res.status} ${t}`);
   }
-  return res.json(); // { access_token, refresh_token, token_type, ... }
+  return res.json();
 }
 
 export async function getUserInfo(accessToken) {
@@ -48,11 +56,12 @@ export async function getUserInfo(accessToken) {
 }
 
 async function refreshToken(tokens) {
+  const { appKey, appSecret } = await getCreds();
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: tokens.refresh_token,
-    client_id: APP_KEY,
-    client_secret: APP_SECRET,
+    client_id: appKey,
+    client_secret: appSecret,
   });
   const res = await fetch("https://api.dropboxapi.com/oauth2/token", {
     method: "POST",
@@ -70,8 +79,7 @@ async function withValidToken(tokens, fn) {
   } catch (err) {
     if (String(err?.message || "").includes("expired_access_token")) {
       const fresh = await refreshToken(tokens);
-      const result = await fn(fresh.access_token, fresh);
-      return result;
+      return fn(fresh.access_token, fresh);
     }
     throw err;
   }

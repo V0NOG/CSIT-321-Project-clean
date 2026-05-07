@@ -22,6 +22,7 @@ import FolderFiles from "./pages/FolderFiles";
 import TotpSetup from "./pages/Security/TotpSetup";
 import SharedWithMe from "./pages/SharedWithMe";
 import StorageConnectors from "./pages/StorageConnectors";
+import Explorer from "./pages/Explorer";
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/shared" element={<SharedWithMe />} />
           <Route path="/connectors" element={<StorageConnectors />} />
+          <Route path="/explorer" element={<Explorer />} />
           <Route path="/file-manager/folder/custom/:folderId" element={<FolderFiles />} />
         </Route>
 

@@ -9,11 +9,15 @@ export default function AnalyticsBarChart() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const s = await fetchAnalyticsSummary();
-      if (!alive) return;
-      const dates = (s.uploads30 ?? []).map(d => d.date);
-      const values = (s.uploads30 ?? []).map(d => d.count);
-      setData({ dates, values });
+      try {
+        const s = await fetchAnalyticsSummary();
+        if (!alive) return;
+        const dates = (s.uploads30 ?? []).map(d => d.date);
+        const values = (s.uploads30 ?? []).map(d => d.count);
+        setData({ dates, values });
+      } catch {
+        // silently ignore — chart remains empty
+      }
     })();
     return () => { alive = false; };
   }, []);

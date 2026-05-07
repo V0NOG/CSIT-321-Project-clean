@@ -15,8 +15,9 @@ export type Folder = {
   createdAt: string;
 };
 
-export async function listFolders(): Promise<Folder[]> {
-  const res = await axios.get(BASE, { headers: authHeader(), withCredentials: true });
+export async function listFolders(q?: string): Promise<Folder[]> {
+  const params = q ? { q } : undefined;
+  const res = await axios.get(BASE, { headers: authHeader(), withCredentials: true, params });
   return res.data.items || [];
 }
 

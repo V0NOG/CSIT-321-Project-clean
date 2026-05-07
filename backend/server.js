@@ -15,6 +15,7 @@ import analyticsRoutes from "./routes/analytics.js";
 import sharesRouter from "./routes/shares.js";
 import foldersRouter from "./routes/folders.js";
 import connectorsRouter from "./routes/connectors.js";
+import settingsRouter from "./routes/settings.js";
 const app = express();
 
 // --- security & parsing ---
@@ -53,6 +54,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/shares", sharesRouter);
 app.use("/api/folders", foldersRouter);
 app.use("/api/connectors", connectorsRouter);
+app.use("/api/settings", settingsRouter);
 
 // central error handler
 // eslint-disable-next-line no-unused-vars

@@ -8,6 +8,7 @@ import {
   handleGoogleCallback,
   startDropboxAuth,
   handleDropboxCallback,
+  getConnectorConfig,
 } from "../controllers/connectorsController.js";
 
 const router = express.Router();
@@ -18,6 +19,7 @@ router.get("/dropbox/callback", handleDropboxCallback);
 
 // All other routes require auth
 router.use(verifyToken);
+router.get("/config", getConnectorConfig);
 router.get("/", listConnectors);
 router.delete("/:id", deleteConnector);
 router.get("/google/auth", startGoogleAuth);

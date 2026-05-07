@@ -2,6 +2,7 @@
 import jwt from "jsonwebtoken";
 import StorageConnector from "../models/StorageConnector.js";
 import { sealSecret, openSecret } from "../services/crypto.js";
+import { loadCredential } from "../services/credentialLoader.js";
 import {
   getAuthUrl as getGoogleAuthUrl,
   exchangeCode as exchangeGoogleCode,
@@ -52,10 +53,14 @@ export async function deleteConnector(req, res) {
 }
 
 // GET /api/connectors/google/auth — returns { authUrl }
-export function startGoogleAuth(req, res) {
-  const stateToken = signState(req.user.id);
-  const authUrl = getGoogleAuthUrl(stateToken);
-  res.json({ authUrl });
+export async function startGoogleAuth(req, res) {
+  try {
+    const stateToken = signState(req.user.id);
+    const authUrl = await getGoogleAuthUrl(stateToken);
+    res.json({ authUrl });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || "Failed to build Google auth URL" });
+  }
 }
 
 // GET /api/connectors/google/callback  (browser redirect from Google)
@@ -91,15 +96,24 @@ export async function handleGoogleCallback(req, res) {
     res.redirect(`${FRONTEND_URL}/connectors?success=google`);
   } catch (e) {
     console.error("[google callback]", e);
-    res.redirect(`${FRONTEND_URL}/connectors?error=google_failed`);
+    const msg =
+      e?.response?.data?.error_description ||
+      e?.response?.data?.error ||
+      e?.message ||
+      "google_auth_failed";
+    res.redirect(`${FRONTEND_URL}/connectors?error=${encodeURIComponent(msg)}`);
   }
 }
 
 // GET /api/connectors/dropbox/auth — returns { authUrl }
-export function startDropboxAuth(req, res) {
-  const stateToken = signState(req.user.id);
-  const authUrl = getDropboxAuthUrl(stateToken);
-  res.json({ authUrl });
+export async function startDropboxAuth(req, res) {
+  try {
+    const stateToken = signState(req.user.id);
+    const authUrl = await getDropboxAuthUrl(stateToken);
+    res.json({ authUrl });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || "Failed to build Dropbox auth URL" });
+  }
 }
 
 // GET /api/connectors/dropbox/callback
@@ -136,7 +150,31 @@ export async function handleDropboxCallback(req, res) {
     res.redirect(`${FRONTEND_URL}/connectors?success=dropbox`);
   } catch (e) {
     console.error("[dropbox callback]", e);
-    res.redirect(`${FRONTEND_URL}/connectors?error=dropbox_failed`);
+    const msg = e?.message || "dropbox_auth_failed";
+    res.redirect(`${FRONTEND_URL}/connectors?error=${encodeURIComponent(msg)}`);
+  }
+}
+
+// GET /api/connectors/config — returns redirect URIs and credential status
+export async function getConnectorConfig(req, res) {
+  try {
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:5050";
+    const [googleClientId, googleClientSecret, dropboxAppKey, dropboxAppSecret] = await Promise.all([
+      loadCredential("GOOGLE_CLIENT_ID"),
+      loadCredential("GOOGLE_CLIENT_SECRET"),
+      loadCredential("DROPBOX_APP_KEY"),
+      loadCredential("DROPBOX_APP_SECRET"),
+    ]);
+    res.json({
+      googleRedirectUri: `${backendUrl}/api/connectors/google/callback`,
+      dropboxRedirectUri: `${backendUrl}/api/connectors/dropbox/callback`,
+      googleClientIdPresent: !!googleClientId,
+      googleClientSecretPresent: !!googleClientSecret,
+      dropboxAppKeyPresent: !!dropboxAppKey,
+      dropboxAppSecretPresent: !!dropboxAppSecret,
+    });
+  } catch {
+    res.status(500).json({ error: "Failed to get config" });
   }
 }
 

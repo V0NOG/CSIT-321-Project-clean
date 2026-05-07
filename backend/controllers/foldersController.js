@@ -5,7 +5,10 @@ import mongoose from "mongoose";
 
 export async function listFolders(req, res) {
   try {
-    const items = await Folder.find({ owner: req.user.id }).sort({ name: 1 }).lean();
+    const q = (req.query.q || "").trim();
+    const filter = { owner: req.user.id };
+    if (q) filter.name = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+    const items = await Folder.find(filter).sort({ name: 1 }).lean();
     res.json({ items });
   } catch (e) {
     res.status(500).json({ error: "Failed to list folders" });
