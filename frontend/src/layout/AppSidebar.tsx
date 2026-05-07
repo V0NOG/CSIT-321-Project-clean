@@ -38,6 +38,16 @@ const navItems: NavItem[] = [
     path: "/file-manager",
   },
   {
+    icon: <ListIcon />,
+    name: "Shared With Me",
+    path: "/shared",
+  },
+  {
+    icon: <PlugInIcon />,
+    name: "Storage Connectors",
+    path: "/connectors",
+  },
+  {
     icon: <GridIcon />,
     name: "Analytics",
     path: "/analytics",

@@ -5,9 +5,10 @@ import { listMyFiles } from "../api/filesApi";
 type Params = {
   page: number;
   limit: number;
-  sort?: string; // e.g. "createdAt:desc"
+  sort?: string;
   q?: string;
-  type?: string; // "image" | "video" | "audio" | "doc" | undefined
+  type?: string;
+  folder?: string; // MongoDB ObjectId or "null" to show root files
 };
 
 export function useFiles(initial?: Partial<Params>) {
@@ -20,14 +21,14 @@ export function useFiles(initial?: Partial<Params>) {
   const [sort, setSort] = useState(initial?.sort ?? "createdAt:desc");
   const [q, _setQuery] = useState(initial?.q ?? "");
   const [type, _setType] = useState(initial?.type ?? undefined);
+  const [folder, _setFolder] = useState(initial?.folder ?? undefined);
 
-  // guards
   const inflight = useRef(false);
   const mounted = useRef(false);
 
   const params: Params = useMemo(
-    () => ({ page, limit, sort, q, type }),
-    [page, limit, sort, q, type]
+    () => ({ page, limit, sort, q, type, folder }),
+    [page, limit, sort, q, type, folder]
   );
 
   const fetchOnce = async (p: Params) => {
@@ -54,7 +55,7 @@ export function useFiles(initial?: Partial<Params>) {
       mounted.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, sort, q, type]);
+  }, [page, limit, sort, q, type, folder]);
 
   // listen to global refresh event (e.g., after upload)
   useEffect(() => {
@@ -74,6 +75,10 @@ export function useFiles(initial?: Partial<Params>) {
   };
   const setType = (nextType?: string) => {
     _setType(nextType || undefined);
+    _setPage(1);
+  };
+  const setFolder = (nextFolder?: string) => {
+    _setFolder(nextFolder || undefined);
     _setPage(1);
   };
   const setPage = (next: number) => _setPage(Math.max(1, next));
@@ -104,6 +109,7 @@ export function useFiles(initial?: Partial<Params>) {
     setPage,
     setLimit,
     setSort,
+    setFolder,
 
     // actions
     refresh,

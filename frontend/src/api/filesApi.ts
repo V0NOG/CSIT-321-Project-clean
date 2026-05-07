@@ -17,7 +17,8 @@ export type ListParams = {
   limit?: number;
   q?: string;
   type?: string;
-  sort?: string; // e.g. "createdAt:desc"
+  sort?: string;
+  folder?: string; // ObjectId or "null" for root
 };
 
 export type FileRow = {
@@ -44,11 +45,12 @@ const api = axios.create({
 
 // ---------- LIST ----------
 export async function listMyFiles(
-  { page = 1, limit = 10, sort = "createdAt:desc", q = "", type = "" }: ListParams,
+  { page = 1, limit = 10, sort = "createdAt:desc", q = "", type = "", folder }: ListParams,
   opts?: { signal?: AbortSignal }
 ): Promise<{ items: any[]; total: number }> {
   const params: any = { page, limit, sort, q };
   if (type) params.type = type;
+  if (folder !== undefined) params.folder = folder;
   const res = await api.get("/files", { params, signal: opts?.signal, headers: { ...authHeader() } });
   return { items: res.data.items || [], total: res.data.total || 0 };
 }
@@ -69,10 +71,12 @@ export async function setFileKey(fileId: string, wrappedKeyB64: string) {
 }
 
 // 3) Upload ciphertext (Blob of iv||cipher+tag)
-export async function uploadCiphertext(fileId: string, blob: Blob) {
-  // Convert to ArrayBuffer for fetch body
+export async function uploadCiphertext(fileId: string, blob: Blob, connectorId?: string) {
   const buf = await blob.arrayBuffer();
-  const res = await fetch(`${BASE}/files/upload/${fileId}`, {
+  const url = connectorId
+    ? `${BASE}/files/upload/${fileId}?connector=${encodeURIComponent(connectorId)}`
+    : `${BASE}/files/upload/${fileId}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: { ...authHeader(), "Content-Type": "application/octet-stream" },
     body: buf,
@@ -81,21 +85,17 @@ export async function uploadCiphertext(fileId: string, blob: Blob) {
   return res.json();
 }
 
-// High-level helper used by the component: encrypt + set key + upload
-export async function encryptWrapAndUpload(file: File): Promise<{ fileId: string }> {
-  // init metadata first to get fileId
+// High-level helper: encrypt + set key + upload (optionally to a specific connector)
+export async function encryptWrapAndUpload(file: File, connectorId?: string): Promise<{ fileId: string }> {
   const { fileId } = await initUpload({ name: file.name, size: file.size, mime: file.type || "application/octet-stream" });
 
-  // generate a strong per-file key and encrypt file with it
   const fileKey = genFileKey();
   const { ciphertext } = await encryptFileBlob(file, fileKey);
 
-  // wrap with user's KEK and save
   const wrappedKeyB64 = await wrapFileKey(fileKey);
   await setFileKey(fileId, wrappedKeyB64);
 
-  // upload
-  await uploadCiphertext(fileId, ciphertext);
+  await uploadCiphertext(fileId, ciphertext, connectorId);
 
   return { fileId };
 }
@@ -137,6 +137,33 @@ export async function downloadDecryptedBlob(row: { _id: string; name: string; mi
   const fileKey = await unwrapFileKey(wrappedKeyB64); // 32 bytes expected
   const plainBlob = await decryptAesGcmToBlob(cipherBlob, fileKey, row.mime || "application/octet-stream");
   return plainBlob;
+}
+
+/**
+ * Download a shared file using the ZK path:
+ * 1. Fetch the key blob wrapped with our RSA public key from the share record
+ * 2. Decrypt with our RSA private key (which was wrapped with our KEK)
+ * 3. Download ciphertext from backend (share recipient is authorized)
+ * 4. Decrypt file and return blob
+ */
+export async function downloadSharedDecryptedBlob(
+  shareId: string,
+  fileMeta: { _id: string; name: string; mime: string }
+): Promise<Blob> {
+  const { getSharedFileKey } = await import("./sharesApi");
+  const { getMyKeys } = await import("./keysApi");
+  const { unwrapSharedFileKey } = await import("../crypto/asymmetric");
+
+  const [{ wrappedKeyB64 }, { encPrivKey }] = await Promise.all([
+    getSharedFileKey(shareId),
+    getMyKeys(),
+  ]);
+
+  if (!encPrivKey) throw new Error("Your encryption keys are not set up. Please log in again.");
+
+  const fileKey = await unwrapSharedFileKey(wrappedKeyB64, encPrivKey);
+  const cipherBlob = await downloadFile(fileMeta._id);
+  return decryptAesGcmToBlob(cipherBlob, fileKey, fileMeta.mime || "application/octet-stream");
 }
 
 // RENAME

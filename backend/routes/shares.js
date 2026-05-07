@@ -3,7 +3,7 @@ import express from "express";
 import { verifyToken } from "../middleware/auth.js";
 import Share from "../models/Share.js";
 import User from "../models/User.js";
-import FileModel from "../models/File.js"; // ⬅️ alias to avoid global File clash
+import FileModel from "../models/File.js";
 import {
   listForFile,
   createShare,
@@ -13,6 +13,8 @@ import {
   inbox,
   accept,
   decline,
+  saveSharedKey,
+  getSharedKey,
 } from "../controllers/sharesController.js";
 
 const router = express.Router();
@@ -20,25 +22,21 @@ const router = express.Router();
 // All routes require auth
 router.use(verifyToken);
 
-/**
- * Owner management (delegated to your controllers)
- */
+// Owner management
 router.get("/file/:fileId", listForFile);
 router.post("/:fileId", express.json(), createShare);
 router.put("/:shareId", express.json(), updateShare);
 router.delete("/:shareId", revokeShare);
 
-/**
- * Recipient views
- * - /mine/list: list files shared *with me* (accepted by default; add ?includePending=1 to include pending)
- * - /inbox: pending invites sent to me
- */
+// ZK file key sharing — owner saves key, recipient retrieves it
+router.post("/:shareId/filekey", express.json(), saveSharedKey);
+router.get("/:shareId/filekey", getSharedKey);
+
+// Recipient views
 router.get("/mine/list", listSharedWithMe);
 router.get("/inbox", inbox);
 
-/**
- * Recipient actions (controller versions)
- */
+// Recipient actions
 router.post("/:shareId/accept", accept);
 router.post("/:shareId/decline", decline);
 
@@ -55,8 +53,8 @@ router.get("/mine/pending", async (req, res) => {
     const pending = await Share.find({
       status: "pending",
       $or: [
-        { recipientUser: req.user.id },
-        ...(email ? [{ recipientEmail: email }] : []),
+        { targetUser: req.user.id },
+        ...(email ? [{ targetEmail: email }] : []),
       ],
     })
       .populate("file", "name size mime")
@@ -94,8 +92,8 @@ router.post("/:id/respond", express.json(), async (req, res) => {
 
     // Must match recipient by user or email
     const isRecipient =
-      (share.recipientUser && String(share.recipientUser) === String(me._id)) ||
-      (myEmail && share.recipientEmail?.toLowerCase?.() === myEmail);
+      (share.targetUser && String(share.targetUser) === String(me._id)) ||
+      (myEmail && share.targetEmail?.toLowerCase?.() === myEmail);
 
     if (!isRecipient) return res.status(403).json({ error: "Not authorized for this share" });
     if (share.status !== "pending") {
@@ -116,22 +114,13 @@ router.post("/:id/respond", express.json(), async (req, res) => {
         return res.status(404).json({ error: "Original file no longer exists" });
       }
 
-      // Copy file metadata into recipient's library (same storageKey -> no re-upload)
-      const copy = await FileModel.create({
-        owner: me._id,
-        name: share.file.name,
-        size: share.file.size,
-        mime: share.file.mime,
-        storageKey: share.file.storageKey, // if you store the blob key/path
-        isSharedCopy: true,
-        sharedFrom: share.file._id,
-      });
+      // Mark share accepted — no file copy needed; recipient downloads via the share record
+      // (The file key for the recipient is stored in SharedFileKey)
 
       share.status = "accepted";
-      share.acceptedAt = new Date();
       await share.save();
 
-      return res.json({ message: "Invite accepted", fileId: copy._id });
+      return res.json({ message: "Invite accepted", shareId: share._id, fileId: share.file._id });
     }
 
     return res.status(400).json({ error: "Invalid action" });

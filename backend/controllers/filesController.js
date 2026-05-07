@@ -2,10 +2,27 @@
 import mongoose from "mongoose";
 import File from "../models/File.js";
 import FileKey from "../models/FileKey.js";
+import Share from "../models/Share.js";
+import User from "../models/User.js";
+import StorageConnector from "../models/StorageConnector.js";
 import { uploadToDropbox, streamFromDropbox } from "../services/dropbox.js";
+import { uploadToDrive, streamFromDrive, deleteFromDrive } from "../services/googledrive.js";
+import { uploadToUserDropbox, streamFromUserDropbox, deleteFromUserDropbox } from "../services/userdropbox.js";
+import { sealSecret, openSecret } from "../services/crypto.js";
 import path from "node:path";
 import { deleteFromDropbox } from "../services/dropbox.js";
 import { appendAudit } from "../services/audit.js";
+
+async function getConnectorService(connectorId) {
+  if (!connectorId) return null;
+  const doc = await StorageConnector.findById(connectorId).lean();
+  if (!doc) return null;
+  return { provider: doc.provider, tokens: JSON.parse(openSecret(doc.encTokens)), _id: doc._id };
+}
+
+async function saveUpdatedTokens(connectorId, tokens) {
+  await StorageConnector.updateOne({ _id: connectorId }, { $set: { encTokens: sealSecret(JSON.stringify(tokens)) } });
+}
 
 function parseSort(sortStr) {
   if (!sortStr) return { createdAt: -1 };
@@ -60,10 +77,14 @@ export async function listFiles(req, res) {
   const q = (req.query.q || "").trim();
   const type = (req.query.type || "").toLowerCase();
   const sort = parseSort(req.query.sort);
-  const filter = { owner: userId };
+  const folderParam = req.query.folder; // "null" = root, ObjectId string = specific folder, undefined = all
+  const filter = { owner: userId, isSharedCopy: { $ne: true } };
   if (q) filter.name = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
   const typeFilter = buildTypeFilter(type);
   if (Object.keys(typeFilter).length) Object.assign(filter, typeFilter);
+  if (folderParam !== undefined) {
+    filter.folder = folderParam === "null" ? null : folderParam;
+  }
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
     File.find(filter).sort(sort).skip(skip).limit(limit).lean(),
@@ -116,7 +137,7 @@ export async function getFileKey(req, res) {
   return res.json({ wrappedKeyB64: keyDoc.wrappedKeyB64 });
 }
 
-// POST /api/files/upload/:id  (ciphertext -> Dropbox)
+// POST /api/files/upload/:id  (ciphertext -> storage)
 export async function uploadCiphertext(req, res) {
   try {
     const userId = req.user.id;
@@ -125,65 +146,90 @@ export async function uploadCiphertext(req, res) {
     if (!meta) return res.status(404).json({ error: "File not found" });
 
     const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
-    // Store under a deterministic path (avoid collisions, allow overwrite via autorename)
     const ext = path.extname(meta.name) || ".bin";
-    const dbxPath = `/csit321/${userId}/${fileId}${ext}.enc`;
+    const connectorId = req.query.connector || meta.connector;
+    const connector = connectorId ? await getConnectorService(connectorId) : null;
 
-    const storedPath = await uploadToDropbox(dbxPath, bytes);
+    let fileUpdate = { status: "ready" };
 
-    // IMPORTANT: save to top-level dropboxPath (matches schema)
-    await File.updateOne(
-      { _id: fileId },
-      { $set: { status: "ready", dropboxPath: storedPath } }
-    );
+    if (connector?.provider === "google_drive") {
+      const filename = `${fileId}${ext}.enc`;
+      const { fileId: driveFileId, updatedTokens } = await uploadToDrive(connector.tokens, filename, bytes);
+      await saveUpdatedTokens(connector._id, updatedTokens);
+      fileUpdate.connector = connector._id;
+      fileUpdate.connectorFileId = driveFileId;
+    } else if (connector?.provider === "dropbox") {
+      const dbxPath = `/csit321/${userId}/${fileId}${ext}.enc`;
+      const { path: storedPath, updatedTokens } = await uploadToUserDropbox(connector.tokens, dbxPath, bytes);
+      await saveUpdatedTokens(connector._id, updatedTokens);
+      fileUpdate.connector = connector._id;
+      fileUpdate.dropboxPath = storedPath;
+    } else {
+      // Default: app-level Dropbox
+      const dbxPath = `/csit321/${userId}/${fileId}${ext}.enc`;
+      const storedPath = await uploadToDropbox(dbxPath, bytes);
+      fileUpdate.dropboxPath = storedPath;
+    }
 
-    // record upload in audit log
-    await appendAudit({
-      actorId: userId,
-      action: "upload",
-      target: String(fileId),
-      meta: { name: meta.name, size: meta.size, mime: meta.mime }
-    });
+    await File.updateOne({ _id: fileId }, { $set: fileUpdate });
+    await appendAudit({ actorId: userId, action: "upload", target: String(fileId), meta: { name: meta.name, size: meta.size, mime: meta.mime } });
 
-    return res.status(200).json({ ok: true, path: storedPath });
+    return res.status(200).json({ ok: true });
   } catch (e) {
     console.error("[uploadCiphertext] error:", e);
     return res.status(500).json({ error: "Upload failed" });
   }
 }
 
-// GET /api/files/:id/download  (ciphertext stream from Dropbox)
+// GET /api/files/:id/download  (ciphertext stream from storage)
 export async function downloadFile(req, res) {
   try {
     const userId = req.user.id;
     const fileId = req.params.id;
-    const doc = await File.findOne({ _id: fileId, owner: userId }).lean();
-    // Prefer top-level dropboxPath; fallback to any legacy storage.dropboxPath
-    const dropboxPath = doc?.dropboxPath || doc?.storage?.dropboxPath;
-    if (!doc || !dropboxPath) {
-      return res.status(404).json({ error: "Not found" });
+
+    // Allow owner OR accepted share recipient
+    let doc = await File.findOne({ _id: fileId, owner: userId }).lean();
+    if (!doc) {
+      // Check for accepted share
+      const myUser = await User.findById(userId).select("email").lean();
+      const myEmail = myUser?.email?.toLowerCase();
+      const share = await Share.findOne({
+        file: fileId,
+        status: "accepted",
+        $or: [
+          { targetUser: userId },
+          ...(myEmail ? [{ targetEmail: myEmail }] : []),
+        ],
+      }).lean();
+      if (!share) return res.status(403).json({ error: "Not authorized" });
+      doc = await File.findById(fileId).lean();
     }
 
+    if (!doc) return res.status(404).json({ error: "Not found" });
+
     res.setHeader("Content-Type", "application/octet-stream");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${doc.name}"`
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${doc.name}"`);
+    await appendAudit({ actorId: userId, action: "download", target: String(fileId), meta: { name: doc.name, size: doc.size, mime: doc.mime } });
 
-    // record download intent in audit log (start of stream)
-    await appendAudit({
-      actorId: userId,
-      action: "download",
-      target: String(fileId),
-      meta: { name: doc.name, size: doc.size, mime: doc.mime }
-    });
+    const connector = doc.connector ? await getConnectorService(doc.connector) : null;
 
-    const stream = await streamFromDropbox(dropboxPath);
-    stream.on("error", (err) => {
-      console.error("[dropbox download stream] error:", err);
-      if (!res.headersSent) res.status(500).end("Download error");
-    });
-    stream.pipe(res);
+    if (connector?.provider === "google_drive" && doc.connectorFileId) {
+      const { stream, updatedTokens } = await streamFromDrive(connector.tokens, doc.connectorFileId);
+      await saveUpdatedTokens(connector._id, updatedTokens);
+      stream.on("error", (e) => { console.error("[gdrive stream]", e); if (!res.headersSent) res.status(500).end(); });
+      stream.pipe(res);
+    } else if (connector?.provider === "dropbox" && doc.dropboxPath) {
+      const { stream, updatedTokens } = await streamFromUserDropbox(connector.tokens, doc.dropboxPath);
+      await saveUpdatedTokens(connector._id, updatedTokens);
+      stream.on("error", (e) => { console.error("[user dropbox stream]", e); if (!res.headersSent) res.status(500).end(); });
+      stream.pipe(res);
+    } else {
+      const dropboxPath = doc.dropboxPath || doc?.storage?.dropboxPath;
+      if (!dropboxPath) return res.status(404).json({ error: "File not found in storage" });
+      const stream = await streamFromDropbox(dropboxPath);
+      stream.on("error", (err) => { console.error("[dropbox download stream]", err); if (!res.headersSent) res.status(500).end("Download error"); });
+      stream.pipe(res);
+    }
   } catch (e) {
     console.error("[downloadFile] error:", e);
     if (!res.headersSent) return res.status(500).json({ error: "Download failed" });
@@ -214,7 +260,7 @@ export async function renameFile(req, res) {
   }
 }
 
-// DELETE /api/files/:id  (delete DB rows and Dropbox blob)
+// DELETE /api/files/:id  (delete DB rows and storage blob)
 export async function deleteFile(req, res) {
   try {
     const userId = req.user.id;
@@ -223,15 +269,23 @@ export async function deleteFile(req, res) {
     const doc = await File.findOne({ _id: fileId, owner: userId }).lean();
     if (!doc) return res.status(404).json({ error: "File not found" });
 
-    // best-effort delete from Dropbox
-    const dropboxPath = doc.dropboxPath || doc?.storage?.dropboxPath;
-    if (dropboxPath) {
-      try { await deleteFromDropbox(dropboxPath); } catch (e) {
-        console.warn("[deleteFile] dropbox delete failed:", e?.message || e);
+    const connector = doc.connector ? await getConnectorService(doc.connector) : null;
+
+    try {
+      if (connector?.provider === "google_drive" && doc.connectorFileId) {
+        const updatedTokens = await deleteFromDrive(connector.tokens, doc.connectorFileId);
+        await saveUpdatedTokens(connector._id, updatedTokens);
+      } else if (connector?.provider === "dropbox" && doc.dropboxPath) {
+        const updatedTokens = await deleteFromUserDropbox(connector.tokens, doc.dropboxPath);
+        await saveUpdatedTokens(connector._id, updatedTokens);
+      } else {
+        const dropboxPath = doc.dropboxPath || doc?.storage?.dropboxPath;
+        if (dropboxPath) await deleteFromDropbox(dropboxPath);
       }
+    } catch (e) {
+      console.warn("[deleteFile] storage delete failed:", e?.message || e);
     }
 
-    // remove key + file doc
     await FileKey.deleteMany({ file: fileId, owner: userId });
     await File.deleteOne({ _id: fileId, owner: userId });
 

@@ -19,6 +19,14 @@ const FileSchema = new mongoose.Schema(
 
     // Optional status
     status: { type: String, default: "init" }, // init | ready
+
+    // User-created folder (null = root)
+    folder: { type: mongoose.Schema.Types.ObjectId, ref: "Folder", default: null },
+
+    // Which storage connector was used (null = app-level Dropbox)
+    connector: { type: mongoose.Schema.Types.ObjectId, ref: "StorageConnector", default: null },
+    // Provider-specific file ID (e.g., Google Drive file ID)
+    connectorFileId: { type: String },
   },
   { timestamps: true }
 );

@@ -68,15 +68,18 @@ type AlertState = { kind: "none" } | { kind: "success" | "warning" | "error" | "
 export default function RecentFileTable({
   initialType,
   headerTitle,
+  folderId,
 }: {
   initialType?: string;
   headerTitle?: string;
+  folderId?: string;
 }) {
   const { items, total, page, limit, loading, setPage, setLimit, setQuery, setSort, setType, refresh } = useFiles({
     page: 1,
     limit: 10,
     sort: "createdAt:desc",
     type: initialType,
+    folder: folderId,
   });
 
   const files = items || [];

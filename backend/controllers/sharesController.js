@@ -1,5 +1,6 @@
 // backend/controllers/sharesController.js
 import Share from "../models/Share.js";
+import SharedFileKey from "../models/SharedFileKey.js";
 import User from "../models/User.js";
 import mongoose from "mongoose";
 import File from "../models/File.js";
@@ -129,32 +130,30 @@ export async function createShare(req, res) {
     const perm = permission === "editor" ? "editor" : "viewer";
 
     const targetEmail = String(email).toLowerCase().trim();
-    const targetUser = await User.findOne({ email: targetEmail }).select("_id email");
+    const targetUser = await User.findOne({ email: targetEmail }).select("_id email pubKey");
 
     // Prevent sharing to yourself
     if (targetUser && targetUser._id.toString() === userId.toString()) {
       return res.status(400).json({ error: "Cannot share to yourself" });
     }
 
-    // Upsert: prefer binding to targetUser if exists, else email
     const where = targetUser
       ? { file: fileId, owner: userId, targetUser: targetUser._id }
       : { file: fileId, owner: userId, targetEmail };
 
-    const update = { 
-      $set: { 
-        permission: perm, 
-        targetEmail, 
+    const update = {
+      $set: {
+        permission: perm,
+        targetEmail,
         targetUser: targetUser?._id || undefined,
         note: note?.slice(0, 500) || undefined,
-        status: "pending", // NEW: invites start as pending
-      } 
+        status: "pending",
+        keyProvided: false,
+      },
     };
     const opts = { upsert: true, new: true, setDefaultsOnInsert: true };
 
     const doc = await Share.findOneAndUpdate(where, update, opts);
-
-    // (Optional) send email/notification here
 
     res.status(201).json({
       message: "Invite sent",
@@ -164,6 +163,9 @@ export async function createShare(req, res) {
         permission: doc.permission,
         status: doc.status,
         file: { id: file._id, name: file.name },
+        // Return recipient info so client can do ZK key-wrapping
+        targetUserId: targetUser?._id?.toString() || null,
+        targetUserPubKey: targetUser?.pubKey || null,
       },
     });
   } catch (e) {
@@ -171,6 +173,73 @@ export async function createShare(req, res) {
       return res.status(400).json({ error: "Already invited this recipient" });
     }
     res.status(500).json({ error: e.message || "Failed to create share" });
+  }
+}
+
+// POST /api/shares/:shareId/filekey  — owner uploads re-wrapped key for recipient
+export async function saveSharedKey(req, res) {
+  try {
+    const userId = req.user.id;
+    const { shareId } = req.params;
+    const { wrappedKeyB64 } = req.body || {};
+
+    if (!wrappedKeyB64) return res.status(400).json({ error: "wrappedKeyB64 required" });
+
+    const share = await Share.findById(shareId).populate("file", "owner");
+    if (!share) return res.status(404).json({ error: "Share not found" });
+
+    // Only the file owner may provide the key
+    if (share.file?.owner?.toString() !== userId.toString()) {
+      return res.status(403).json({ error: "Not authorized" });
+    }
+
+    await SharedFileKey.findOneAndUpdate(
+      { share: shareId },
+      {
+        $set: {
+          share: shareId,
+          file: share.file._id,
+          senderUser: userId,
+          recipientUser: share.targetUser || undefined,
+          wrappedKeyB64,
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    // Mark the share as having a key provided
+    await Share.updateOne({ _id: shareId }, { $set: { keyProvided: true } });
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to save shared key" });
+  }
+}
+
+// GET /api/shares/:shareId/filekey  — recipient retrieves their wrapped key
+export async function getSharedKey(req, res) {
+  try {
+    const userId = req.user.id;
+    const { shareId } = req.params;
+
+    const share = await Share.findById(shareId);
+    if (!share) return res.status(404).json({ error: "Share not found" });
+
+    // Verify requester is the recipient
+    const myUser = await User.findById(userId).select("email");
+    const myEmail = myUser?.email?.toLowerCase();
+    const isRecipient =
+      (share.targetUser && share.targetUser.toString() === userId.toString()) ||
+      (myEmail && share.targetEmail === myEmail);
+
+    if (!isRecipient) return res.status(403).json({ error: "Not authorized" });
+
+    const keyDoc = await SharedFileKey.findOne({ share: shareId }).lean();
+    if (!keyDoc) return res.status(404).json({ error: "Key not yet provided" });
+
+    res.json({ wrappedKeyB64: keyDoc.wrappedKeyB64, fileId: share.file?.toString() });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to get shared key" });
   }
 }
 

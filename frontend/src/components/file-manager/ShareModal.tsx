@@ -10,9 +10,16 @@ import {
   createShare,
   updateShare,
   revokeShare,
+  saveSharedFileKey,
   SharePermission,
   ShareItem,
 } from "../../api/sharesApi";
+import { getFileKey } from "../../api/filesApi";
+import { unwrapFileKey } from "../../crypto/keys";
+import { wrapFileKeyForRecipient } from "../../crypto/asymmetric";
+import { getMyKeys, getUserPublicKey } from "../../api/keysApi";
+import { initUserKeypair } from "../../crypto/asymmetric";
+import { rotateKeys } from "../../api/keysApi";
 
 export default function ShareModal({
   open,
@@ -31,7 +38,11 @@ export default function ShareModal({
   const [permission, setPermission] = useState<SharePermission>("viewer");
   const [busy, setBusy] = useState(false);
   const [shares, setShares] = useState<ShareItem[]>([]);
-  const [topAlert, setTopAlert] = useState<{ kind: "none" | "success" | "error" | "info" | "warning"; title?: string; message?: string }>({ kind: "none" });
+  const [topAlert, setTopAlert] = useState<{
+    kind: "none" | "success" | "error" | "info" | "warning";
+    title?: string;
+    message?: string;
+  }>({ kind: "none" });
 
   async function load() {
     if (!fileId) return;
@@ -39,7 +50,7 @@ export default function ShareModal({
       const items = await listFileShares(fileId);
       setShares(items);
     } catch (e: any) {
-      setTopAlert({ kind: "error", title: "Failed to load shares", message: e?.response?.data?.error || e?.message || "Please try again." });
+      setTopAlert({ kind: "error", title: "Failed to load shares", message: e?.response?.data?.error || e?.message });
     }
   }
 
@@ -60,12 +71,52 @@ export default function ShareModal({
     }
     try {
       setBusy(true);
+
+      // Ensure own keypair is initialized (needed to decrypt own file key later)
+      await initUserKeypair(getMyKeys, rotateKeys).catch(() => {});
+
       const res = await createShare(fileId, { email, permission });
+      const shareId = res?.share?._id;
+      const targetUserId = res?.share?.targetUserId;
+      let targetPubKey: string | null = res?.share?.targetUserPubKey || null;
+
+      // ZK step: re-wrap the file key for the recipient
+      if (shareId && targetUserId) {
+        if (!targetPubKey) {
+          targetPubKey = await getUserPublicKey(targetUserId);
+        }
+        if (targetPubKey) {
+          try {
+            // 1. Get my own keypair to decrypt the wrapped key
+            const { wrappedKeyB64 } = await getFileKey(fileId);
+            // 2. Unwrap with user's KEK to get raw file key
+            const fileKeyBytes = await unwrapFileKey(wrappedKeyB64);
+            // 3. Re-wrap with recipient's RSA public key
+            const recipientWrapped = await wrapFileKeyForRecipient(fileKeyBytes, targetPubKey);
+            // 4. Send re-wrapped key to backend
+            await saveSharedFileKey(shareId, recipientWrapped);
+          } catch (keyErr) {
+            console.warn("[ShareModal] key re-wrap failed:", keyErr);
+            // Non-fatal — share record was created; key can be provided later
+          }
+        } else {
+          setTopAlert({
+            kind: "warning",
+            title: "Invitation sent (limited)",
+            message: `${email} hasn't set up their encryption keys yet. They can still receive the invite but won't be able to decrypt the file until they log in and set up keys.`,
+          });
+          setEmail("");
+          await load();
+          onShared?.();
+          return;
+        }
+      }
+
       const msg = res?.message || `Invitation sent to ${email}`;
       setTopAlert({ kind: "success", title: "Invitation sent", message: msg });
       setEmail("");
       await load();
-      onShared?.(msg); // let parent show alert too
+      onShared?.(msg);
     } catch (e: any) {
       setTopAlert({ kind: "error", title: "Share failed", message: e?.response?.data?.error || e?.message || "Unable to share this file." });
     } finally {
@@ -79,7 +130,7 @@ export default function ShareModal({
       await load();
       setTopAlert({ kind: "success", title: "Updated", message: "Permission updated." });
     } catch (e: any) {
-      setTopAlert({ kind: "error", title: "Update failed", message: e?.response?.data?.error || e?.message || "Could not update permission." });
+      setTopAlert({ kind: "error", title: "Update failed", message: e?.response?.data?.error || e?.message });
     }
   }
 
@@ -89,24 +140,21 @@ export default function ShareModal({
       await load();
       setTopAlert({ kind: "success", title: "Revoked", message: "Share revoked." });
     } catch (e: any) {
-      setTopAlert({ kind: "error", title: "Revoke failed", message: e?.response?.data?.error || e?.message || "Could not revoke share." });
+      setTopAlert({ kind: "error", title: "Revoke failed", message: e?.response?.data?.error || e?.message });
     }
   }
 
   return (
     <Modal isOpen={open} onClose={onClose} className="max-w-[720px] m-4">
       <div className="p-4 rounded-3xl bg-white dark:bg-gray-900 lg:p-10">
-        <h4 className="text-xl font-semibold text-gray-800 dark:text-white/90">Share “{fileName || "File"}”</h4>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Invite a user and set their permission.</p>
+        <h4 className="text-xl font-semibold text-gray-800 dark:text-white/90">Share "{fileName || "File"}"</h4>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Files are encrypted end-to-end. The recipient's key is wrapped with their public key so only they can decrypt it.
+        </p>
 
         {topAlert.kind !== "none" && (
           <div className="mt-4">
-            <Alert
-              variant={topAlert.kind}
-              title={topAlert.title || ""}
-              message={topAlert.message || ""}
-              showLink={false}
-            />
+            <Alert variant={topAlert.kind} title={topAlert.title || ""} message={topAlert.message || ""} showLink={false} />
           </div>
         )}
 
@@ -134,7 +182,7 @@ export default function ShareModal({
           </div>
           <div className="sm:col-span-2 flex items-end">
             <Button className="w-full" onClick={onInvite} disabled={busy || !fileId}>
-              Invite
+              {busy ? "Sharing…" : "Invite"}
             </Button>
           </div>
         </div>
@@ -189,7 +237,6 @@ export default function ShareModal({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="mt-6 flex justify-end">
           <Button variant="outline" onClick={onClose}>
             Close

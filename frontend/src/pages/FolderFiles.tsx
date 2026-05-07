@@ -1,11 +1,11 @@
 // frontend/src/pages/FolderFiles.tsx
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import PageMeta from "../components/common/PageMeta";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import RecentFileTable from "../components/file-manager/RecentFileTable";
+import { listFolders, Folder } from "../api/foldersApi";
 
-// map URL bucket -> API `type`
 function mapBucketToType(bucket?: string): { type?: string; title: string } {
   const b = (bucket || "").toLowerCase();
   if (b === "images") return { type: "image", title: "Images" };
@@ -16,8 +16,25 @@ function mapBucketToType(bucket?: string): { type?: string; title: string } {
 }
 
 export default function FolderFiles() {
-  const { bucket } = useParams<{ bucket: string }>();
-  const { type, title } = useMemo(() => mapBucketToType(bucket), [bucket]);
+  const { bucket, folderId } = useParams<{ bucket?: string; folderId?: string }>();
+  const [folderName, setFolderName] = useState<string>("");
+
+  // Load user folder name if this is a custom folder
+  useEffect(() => {
+    if (folderId) {
+      listFolders()
+        .then((folders) => {
+          const found = folders.find((f: Folder) => f._id === folderId);
+          setFolderName(found?.name || "Folder");
+        })
+        .catch(() => setFolderName("Folder"));
+    }
+  }, [folderId]);
+
+  const { type, title } = useMemo(() => {
+    if (folderId) return { type: undefined, title: folderName || "Folder" };
+    return mapBucketToType(bucket);
+  }, [bucket, folderId, folderName]);
 
   return (
     <>
@@ -25,7 +42,11 @@ export default function FolderFiles() {
       <PageBreadcrumb pageTitle={title} />
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          <RecentFileTable initialType={type} headerTitle={title} />
+          <RecentFileTable
+            initialType={type}
+            headerTitle={title}
+            folderId={folderId}
+          />
         </div>
       </div>
     </>

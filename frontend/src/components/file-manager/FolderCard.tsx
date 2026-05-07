@@ -9,10 +9,11 @@ interface FolderCardProps {
   title: string;
   fileCount: string;
   size: string;
-  to?: string; // NEW: navigate when the card is clicked
+  to?: string;
+  color?: string; // accent color for user-created folders
 }
 
-const FolderCard: React.FC<FolderCardProps> = ({ title, fileCount, size, to }) => {
+const FolderCard: React.FC<FolderCardProps> = ({ title, fileCount, size, to, color }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   function toggleDropdown(e?: React.MouseEvent) {
@@ -23,6 +24,9 @@ const FolderCard: React.FC<FolderCardProps> = ({ title, fileCount, size, to }) =
     setIsOpen(false);
   }
 
+  const folderColor = color || "#FBBC1A";
+  const folderColorLight = color ? `${color}33` : "#FFDC78";
+
   const CardInner = (
     <>
       <div className="flex justify-between mb-6">
@@ -32,17 +36,16 @@ const FolderCard: React.FC<FolderCardProps> = ({ title, fileCount, size, to }) =
               fillRule="evenodd"
               clipRule="evenodd"
               d="M13.3986 4.40674C12.9265 3.77722 12.1855 3.40674 11.3986 3.40674H2.5C1.11929 3.40674 0 4.52602 0 5.90674V30.0959C0 31.4766 1.11929 32.5959 2.5 32.5959H33.5C34.8807 32.5959 36 31.4766 36 30.0959V11.7446C36 10.3639 34.8807 9.24458 33.5 9.24458H18.277C17.4901 9.24458 16.7492 8.87409 16.277 8.24458L13.3986 4.40674Z"
-              fill="url(#paint0_linear_2816_28044)"
+              fill={`url(#folder_grad_${title.replace(/\s/g, "_")})`}
             />
             <defs>
-              <linearGradient id="paint0_linear_2816_28044" x1="18" y1="3.40674" x2="18" y2="32.5959" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#FFDC78" />
-                <stop offset="1" stopColor="#FBBC1A" />
+              <linearGradient id={`folder_grad_${title.replace(/\s/g, "_")}`} x1="18" y1="3.40674" x2="18" y2="32.5959" gradientUnits="userSpaceOnUse">
+                <stop stopColor={folderColorLight} />
+                <stop offset="1" stopColor={folderColor} />
               </linearGradient>
             </defs>
           </svg>
         </div>
-        {/* menu removed for now */}
       </div>
       <h4 className="mb-1 text-sm font-medium text-gray-800 dark:text-white/90">{title}</h4>
       <div className="flex items-center justify-between">

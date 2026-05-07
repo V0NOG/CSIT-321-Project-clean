@@ -63,16 +63,24 @@ export async function listFileShares(fileId: string): Promise<ShareItem[]> {
 /** Alias used in some components */
 export const listSharesForFile = listFileShares;
 
+export type CreateShareResponse = {
+  message?: string;
+  share?: ShareItem & {
+    targetUserId?: string | null;
+    targetUserPubKey?: string | null;
+  };
+};
+
 /** Create (invite) a share for a file */
 export async function createShare(
   fileId: string,
   payload: { email: string; permission: SharePermission; note?: string }
-) {
+): Promise<CreateShareResponse> {
   const res = await axios.post(`${API}/${fileId}`, payload, {
     headers: { ...authHeader(), "Content-Type": "application/json" },
     withCredentials: true,
   });
-  return res.data as { message?: string; share?: ShareItem };
+  return res.data as CreateShareResponse;
 }
 
 /** Update a share (e.g., change permission) */
@@ -170,6 +178,25 @@ export async function declineShare(shareId: string) {
     { headers: authHeader(), withCredentials: true }
   );
   return res.data as { message?: string };
+}
+
+/** Owner uploads the file key re-wrapped for the recipient (ZK sharing) */
+export async function saveSharedFileKey(shareId: string, wrappedKeyB64: string) {
+  const res = await axios.post(
+    `${API}/${shareId}/filekey`,
+    { wrappedKeyB64 },
+    { headers: { ...authHeader(), "Content-Type": "application/json" }, withCredentials: true }
+  );
+  return res.data as { ok: boolean };
+}
+
+/** Recipient retrieves the file key that was wrapped for them */
+export async function getSharedFileKey(shareId: string): Promise<{ wrappedKeyB64: string; fileId: string }> {
+  const res = await axios.get(`${API}/${shareId}/filekey`, {
+    headers: authHeader(),
+    withCredentials: true,
+  });
+  return res.data;
 }
 
 /* =======================

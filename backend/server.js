@@ -13,6 +13,8 @@ import fileRoutes from "./routes/files.js";
 import aclRoutes from "./routes/acl.js";
 import analyticsRoutes from "./routes/analytics.js";
 import sharesRouter from "./routes/shares.js";
+import foldersRouter from "./routes/folders.js";
+import connectorsRouter from "./routes/connectors.js";
 const app = express();
 
 // --- security & parsing ---
@@ -49,6 +51,8 @@ app.use("/api/files", fileRoutes);
 app.use("/api/acl", aclRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/shares", sharesRouter);
+app.use("/api/folders", foldersRouter);
+app.use("/api/connectors", connectorsRouter);
 
 // central error handler
 // eslint-disable-next-line no-unused-vars

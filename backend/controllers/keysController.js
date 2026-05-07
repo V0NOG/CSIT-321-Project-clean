@@ -9,6 +9,13 @@ export const getPublicKey = async (req, res) => {
   res.json({ pubKey: user.pubKey });
 };
 
+// GET /api/keys/me  — returns own pubKey + encPrivKey so the client can decrypt the private key
+export const getMyKeys = async (req, res) => {
+  const user = await User.findById(req.user.id).select("pubKey encPrivKey");
+  if (!user) return res.status(404).json({ error: "User not found" });
+  res.json({ pubKey: user.pubKey || null, encPrivKey: user.encPrivKey || null });
+};
+
 const RotateSchema = z.object({
   pubKey: z.string().min(1),      // PEM/JWK/Base64 — your choice
   encPrivKey: z.string().min(1),  // encrypted private key blob

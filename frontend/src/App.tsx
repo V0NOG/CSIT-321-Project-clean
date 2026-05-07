@@ -21,6 +21,7 @@ import VideoGeneratorPage from "./pages/Ai/VideoGenerator";
 import FolderFiles from "./pages/FolderFiles";
 import TotpSetup from "./pages/Security/TotpSetup";
 import SharedWithMe from "./pages/SharedWithMe";
+import StorageConnectors from "./pages/StorageConnectors";
 
 export default function App() {
   return (
@@ -48,6 +49,8 @@ export default function App() {
           <Route path="/file-manager/folder/:bucket" element={<FolderFiles />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/shared" element={<SharedWithMe />} />
+          <Route path="/connectors" element={<StorageConnectors />} />
+          <Route path="/file-manager/folder/custom/:folderId" element={<FolderFiles />} />
         </Route>
 
         {/* Fallback Route */}
