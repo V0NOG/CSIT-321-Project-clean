@@ -14,6 +14,8 @@ export default function GoogleAuthButton({
   onError?: (msg: string) => void;
 }) {
   const divRef = useRef<HTMLDivElement | null>(null);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
   useEffect(() => {
     const src = "https://accounts.google.com/gsi/client";
@@ -27,7 +29,6 @@ export default function GoogleAuthButton({
       s.onload = init;
       document.head.appendChild(s);
     } else {
-      // If already loaded, try to init immediately
       if ((existing as any)._loaded) init();
       else existing.addEventListener("load", init, { once: true });
     }
@@ -36,7 +37,7 @@ export default function GoogleAuthButton({
       (document.querySelector(`script[src="${src}"]`) as any)._loaded = true;
       const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
       if (!CLIENT_ID) {
-        onError?.("Missing VITE_GOOGLE_CLIENT_ID in frontend/.env");
+        onErrorRef.current?.("Missing VITE_GOOGLE_CLIENT_ID in frontend/.env");
         return;
       }
       if (!window.google || !divRef.current) return;
@@ -60,7 +61,7 @@ export default function GoogleAuthButton({
               e?.response?.data?.message ||
               e?.message ||
               "Google login failed";
-            onError?.(msg);
+            onErrorRef.current?.(msg);
           }
         },
         auto_select: false,
@@ -74,7 +75,7 @@ export default function GoogleAuthButton({
         shape: "pill",
       });
     }
-  }, [onError]);
+  }, []);
 
   return (
     <div className="flex justify-center">

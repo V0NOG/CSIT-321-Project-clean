@@ -12,9 +12,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="relative flex items-center justify-center z-1">
             <div className="flex flex-col items-center max-w-xs">
               <Link to="/" className="block mb-4">
-                <img width={231} height={48} src="/images/logo/logo.svg" alt="Logo" />
+                <img width={231} height={48} src="/images/logo/logo-dark.svg" alt="Logo" />
               </Link>
-              <p className="text-center text-gray-400 dark:text-white/60">CSIT-321 | Project</p>
+              <p className="text-center text-gray-300 dark:text-white/70">CSIT-321 | Project</p>
             </div>
           </div>
         </div>

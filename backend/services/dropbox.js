@@ -35,20 +35,23 @@ async function refreshAccessToken() {
   return ACCESS_TOKEN;
 }
 
+const TOKEN_ERRORS = ["expired_access_token", "invalid_access_token", "401"];
+
 async function withValidToken(fn) {
   try {
-    // Try with current token first
     return await fn(ACCESS_TOKEN);
   } catch (err) {
     const msg = String(err?.message || err);
-    // If token expired, refresh once then retry
-    if (msg.includes("expired_access_token")) {
+    if (TOKEN_ERRORS.some((e) => msg.includes(e))) {
       const fresh = await refreshAccessToken();
       return await fn(fresh);
     }
     throw err;
   }
 }
+
+// Pre-refresh on startup so the first request doesn't pay the retry cost
+refreshAccessToken().then((t) => { ACCESS_TOKEN = t; }).catch(() => {});
 
 // Upload bytes to Dropbox; returns the canonical path (lowercase)
 export async function uploadToDropbox(path, bytes) {

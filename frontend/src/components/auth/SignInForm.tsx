@@ -110,7 +110,7 @@ export default function SignInForm() {
       <div className="w-full max-w-md pt-10 mx-auto">
         <Link
           to="/"
-          className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-200 dark:hover:text-white"
         >
           <ChevronLeftIcon className="size-5" />
           Back to dashboard
@@ -123,7 +123,7 @@ export default function SignInForm() {
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
               Sign In
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-200">
               Enter your email and password to sign in.
             </p>
           </div>
@@ -200,7 +200,7 @@ export default function SignInForm() {
                     onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
                     required
                   />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-200">
                     Open Google Authenticator, 1Password, or Authy to get your code.
                   </p>
                 </div>
@@ -212,7 +212,7 @@ export default function SignInForm() {
                     checked={rememberEmail}
                     onChange={setRememberEmail}
                   />
-                  <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
+                  <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-200">
                     Remember email
                   </span>
                 </div>
@@ -233,7 +233,7 @@ export default function SignInForm() {
           </form>
 
           <div className="mt-5">
-            <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
+            <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-200 sm:text-start">
               Don&apos;t have an account?{" "}
               <Link
                 to="/signup"
