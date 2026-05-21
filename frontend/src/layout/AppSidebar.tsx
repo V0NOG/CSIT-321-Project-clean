@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import {
-  AiIcon,
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
@@ -44,17 +43,6 @@ const navItems: NavItem[] = [
     icon: <GridIcon />,
     name: "Analytics",
     path: "/analytics",
-  },
-  {
-    name: "AI Assistant",
-    icon: <AiIcon />,
-    new: true,
-    subItems: [
-      { name: "Text Generator", path: "/text-generator" },
-      { name: "Image Generator", path: "/image-generator" },
-      { name: "Code Generator", path: "/code-generator" },
-      { name: "Video Generator", path: "/video-generator" },
-    ],
   },
 ];
 
