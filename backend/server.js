@@ -5,6 +5,8 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./swagger.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import totpRoutes from "./routes/totp.js";
@@ -42,6 +44,12 @@ app.use((req, _res, next) => {
 });
 
 app.get("/", (_req, res) => res.send("API is working"));
+
+// Swagger UI — available at http://localhost:5050/api-docs
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: "SecureVault API Docs",
+  swaggerOptions: { persistAuthorization: true },
+}));
 
 // routes
 app.use("/api/auth", authRoutes);
