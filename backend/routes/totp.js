@@ -35,7 +35,7 @@ const router = express.Router();
  *                 otpauthUrl:
  *                   type: string
  *                   description: otpauth:// URI to encode in a QR code
- *                   example: "otpauth://totp/SecureVault:alice%40example.com?secret=BASE32SECRET&issuer=SecureVault"
+ *                   example: "otpauth://totp/Cipher Cloud:alice%40example.com?secret=BASE32SECRET&issuer=Cipher Cloud"
  *                 qrCode:
  *                   type: string
  *                   description: Base64-encoded PNG QR code (data URI)

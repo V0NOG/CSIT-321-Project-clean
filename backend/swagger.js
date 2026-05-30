@@ -4,7 +4,7 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "SecureVault API",
+      title: "Cipher Cloud API",
       version: "1.0.0",
       description:
         "Zero-knowledge encrypted file storage and sharing platform. All file content is encrypted client-side before upload; the server never handles plaintext or private keys.",

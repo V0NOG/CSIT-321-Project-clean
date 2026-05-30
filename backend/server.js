@@ -47,7 +47,7 @@ app.get("/", (_req, res) => res.send("API is working"));
 
 // Swagger UI — available at http://localhost:5050/api-docs
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customSiteTitle: "SecureVault API Docs",
+  customSiteTitle: "Cipher Cloud API Docs",
   swaggerOptions: { persistAuthorization: true },
 }));
 
