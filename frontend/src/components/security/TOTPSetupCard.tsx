@@ -25,7 +25,7 @@ export default function TOTPSetupCard() {
   useEffect(() => {
     (async () => {
       try {
-        const me = await axios.get("http://localhost:5050/api/user/me", {
+        const me = await axios.get("/api/user/me", {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
         });
@@ -41,7 +41,7 @@ export default function TOTPSetupCard() {
     setLoading(true);
     try {
       const res = await axios.post<SetupResp>(
-        "http://localhost:5050/api/auth/totp/setup",
+        "/api/auth/totp/setup",
         {},
         { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
       );
@@ -59,7 +59,7 @@ export default function TOTPSetupCard() {
     setLoading(true);
     try {
       await axios.post(
-        "http://localhost:5050/api/auth/totp/enable",
+        "/api/auth/totp/enable",
         { code },
         { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
       );

@@ -38,7 +38,7 @@ export default function GoogleLoginButton() {
       callback: async (resp: { credential: string }) => {
         try {
           const res = await axios.post(
-            "http://localhost:5050/api/auth/google",
+            "/api/auth/google",
             { idToken: resp.credential },
             { withCredentials: true }
           );

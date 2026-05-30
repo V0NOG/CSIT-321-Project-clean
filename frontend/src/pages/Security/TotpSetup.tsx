@@ -48,7 +48,7 @@ export default function TotpSetup() {
 
   async function loadStatus() {
     try {
-      const res = await axios.get("http://localhost:5050/api/user/mfa", {
+      const res = await axios.get("/api/user/mfa", {
         withCredentials: true,
         headers: authHeader(),
       });
@@ -66,7 +66,7 @@ export default function TotpSetup() {
     try {
       setBusy(true);
       const res = await axios.post(
-        "http://localhost:5050/api/auth/totp/setup",
+        "/api/auth/totp/setup",
         {},
         { withCredentials: true, headers: authHeader() }
       );
@@ -96,7 +96,7 @@ export default function TotpSetup() {
     try {
       setBusy(true);
       const res = await axios.post(
-        "http://localhost:5050/api/auth/totp/enable",
+        "/api/auth/totp/enable",
         { tempSecret, code },
         { withCredentials: true, headers: authHeader() }
       );
@@ -117,7 +117,7 @@ export default function TotpSetup() {
     try {
       setBusy(true);
       await axios.post(
-        "http://localhost:5050/api/auth/totp/disable",
+        "/api/auth/totp/disable",
         { code: disableCode || undefined },
         { withCredentials: true, headers: authHeader() }
       );

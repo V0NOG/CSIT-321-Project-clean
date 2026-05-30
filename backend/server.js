@@ -19,6 +19,12 @@ import foldersRouter from "./routes/folders.js";
 import connectorsRouter from "./routes/connectors.js";
 import settingsRouter from "./routes/settings.js";
 const app = express();
+const corsOrigins = [
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
+  "http://localhost:5174",
+].filter(Boolean);
 
 // --- security & parsing ---
 app.use(helmet({ crossOriginResourcePolicy: false }));
@@ -29,7 +35,7 @@ app.use(cookieParser());
 // --- CORS (frontend origin only) ---
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: corsOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],

@@ -1,6 +1,6 @@
 // frontend/src/api/userApi.ts
 import axios from "axios";
-const API_URL = "http://localhost:5050/api/user";
+const API_URL = "/api/user";
 
 function authHeader() {
   const token = localStorage.getItem("token") || "";

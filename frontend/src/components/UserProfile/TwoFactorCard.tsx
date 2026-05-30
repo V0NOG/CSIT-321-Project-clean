@@ -13,7 +13,7 @@ export default function TwoFactorCard() {
     let mounted = true;
     async function fetchStatus() {
       try {
-        const res = await axios.get("http://localhost:5050/api/user/me", {
+        const res = await axios.get("/api/user/me", {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
         });

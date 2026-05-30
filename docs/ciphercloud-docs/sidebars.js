@@ -1,6 +1,11 @@
 /** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
 const sidebars = {
 
+  marketingSidebar: [
+    'marketing/index',
+    'marketing/assets-showcase',
+  ],
+
   userManualSidebar: [
     {
       type: 'category',
@@ -19,8 +24,6 @@ const sidebars = {
         'user-manual/analytics',
         'user-manual/profile',
         'user-manual/troubleshooting',
-        'user-manual/faq',
-        'user-manual/glossary',
       ],
     },
   ],

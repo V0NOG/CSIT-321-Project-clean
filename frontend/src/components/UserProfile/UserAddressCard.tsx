@@ -36,7 +36,7 @@ export default function UserAddressCard() {
 
   const fetchUserAddress = async () => {
     try {
-      const res = await axios.get("http://localhost:5050/api/user/me", {
+      const res = await axios.get("/api/user/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const latestAddress = res.data.address || {};
@@ -62,7 +62,7 @@ export default function UserAddressCard() {
   const handleSave = async () => {
     try {
       await axios.put(
-        "http://localhost:5050/api/user/me",
+        "/api/user/me",
         { address },
         { headers: { Authorization: `Bearer ${token}` } }
       );

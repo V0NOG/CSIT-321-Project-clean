@@ -15,4 +15,10 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    proxy: {
+      "/api": "http://localhost:5050",
+      "/api-docs": "http://localhost:5050",
+    },
+  },
 });

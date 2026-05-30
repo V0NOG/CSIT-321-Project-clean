@@ -7,8 +7,8 @@ const config = {
   tagline: 'Zero-Knowledge Encrypted File Storage — CSIT-321',
   favicon: 'img/favicon.ico',
 
-  url: 'https://your-domain.com',
-  baseUrl: '/',
+  url: 'https://cipher-cloud.net',
+  baseUrl: '/docs/',
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -58,6 +58,12 @@ const config = {
         items: [
           {
             type: 'docSidebar',
+            sidebarId: 'marketingSidebar',
+            position: 'left',
+            label: 'Marketing',
+          },
+          {
+            type: 'docSidebar',
             sidebarId: 'userManualSidebar',
             position: 'left',
             label: 'User Manual',
@@ -75,7 +81,7 @@ const config = {
             label: 'Deployment',
           },
           {
-            href: 'http://localhost:5050/api-docs',
+            href: 'https://cipher-cloud.net/api-docs',
             label: 'API Docs (Swagger)',
             position: 'right',
           },
@@ -85,6 +91,13 @@ const config = {
       footer: {
         style: 'dark',
         links: [
+          {
+            title: 'Marketing',
+            items: [
+              { label: 'Marketing Audit', to: '/marketing' },
+              { label: 'Poster Showcase', to: '/marketing/assets-showcase' },
+            ],
+          },
           {
             title: 'User Manual',
             items: [

@@ -48,7 +48,7 @@ export default function GoogleAuthButton({
           try {
             if (!resp?.credential) throw new Error("No Google credential from GIS");
             const result = await axios.post(
-              "http://localhost:5050/api/auth/google",
+              "/api/auth/google",
               { idToken: resp.credential },
               { withCredentials: true }
             );

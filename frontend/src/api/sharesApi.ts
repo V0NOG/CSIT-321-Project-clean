@@ -1,7 +1,7 @@
 // frontend/src/api/sharesApi.ts
 import axios from "axios";
 
-const API = "http://localhost:5050/api/shares";
+const API = "/api/shares";
 
 /** Attach bearer token if present */
 function authHeader() {

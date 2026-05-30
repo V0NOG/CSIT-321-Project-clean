@@ -1,7 +1,7 @@
 // frontend/src/api/keysApi.ts
 import axios from "axios";
 
-const BASE = "http://localhost:5050/api/keys";
+const BASE = "/api/keys";
 
 function authHeader() {
   const token = localStorage.getItem("token") || "";

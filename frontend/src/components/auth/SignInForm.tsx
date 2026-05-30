@@ -63,7 +63,7 @@ export default function SignInForm() {
       }
 
       const res = await axios.post(
-        "http://localhost:5050/api/auth/login",
+        "/api/auth/login",
         body,
         {
           withCredentials: true,

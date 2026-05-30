@@ -22,7 +22,7 @@ export default function UserInfoCard() {
 
   const fetchUserData = async () => {
     try {
-      const res = await axios.get("http://localhost:5050/api/user/me", {
+      const res = await axios.get("/api/user/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setInfo(res.data); // Update info with latest data
@@ -42,7 +42,7 @@ export default function UserInfoCard() {
 
   const handleSave = async () => {
     try {
-      await axios.put("http://localhost:5050/api/user/me", info, {
+      await axios.put("/api/user/me", info, {
         headers: { Authorization: `Bearer ${token}` },
       });
       closeModal();

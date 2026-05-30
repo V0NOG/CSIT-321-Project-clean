@@ -1,7 +1,7 @@
 // frontend/src/api/foldersApi.ts
 import axios from "axios";
 
-const BASE = "http://localhost:5050/api/folders";
+const BASE = "/api/folders";
 
 function authHeader() {
   const token = localStorage.getItem("token") || "";

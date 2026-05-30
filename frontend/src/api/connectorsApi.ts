@@ -1,8 +1,8 @@
 // frontend/src/api/connectorsApi.ts
 import axios from "axios";
 
-const BASE = "http://localhost:5050/api/connectors";
-const SETTINGS_BASE = "http://localhost:5050/api/settings";
+const BASE = "/api/connectors";
+const SETTINGS_BASE = "/api/settings";
 
 function authHeader() {
   const token = localStorage.getItem("token") || "";

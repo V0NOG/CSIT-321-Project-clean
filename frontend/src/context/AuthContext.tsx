@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!token) return;
     axios
-      .get("http://localhost:5050/api/user/me", {
+      .get("/api/user/me", {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {

@@ -4,7 +4,7 @@ import { unwrapFileKey, wrapFileKey, genFileKey } from "../crypto/keys";
 import { decryptAesGcmToBlob } from "../crypto/decrypt";
 import { encryptFileBlob } from "../crypto/encrypt";
 
-const BASE = "http://localhost:5050/api";
+const BASE = "/api";
 
 const authHeader = () => {
   const token =
@@ -115,7 +115,7 @@ export async function getFileKey(fileId: string): Promise<{ wrappedKeyB64: strin
 }
 
 export async function listSharedFiles() {
-  const res = await axios.get("http://localhost:5050/api/files/shared", {
+  const res = await axios.get("/api/files/shared", {
     headers: authHeader(),
     withCredentials: true,
   });

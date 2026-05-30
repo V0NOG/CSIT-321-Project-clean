@@ -1,6 +1,6 @@
 // frontend/src/api/analyticsApi.ts
 import axios from "axios";
-const BASE = "http://localhost:5050/api";
+const BASE = "/api";
 
 const authHeader = () => {
   const token = localStorage.getItem("token") || localStorage.getItem("userToken") || "";

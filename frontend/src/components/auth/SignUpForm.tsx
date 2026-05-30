@@ -35,7 +35,7 @@ export default function SignUpForm() {
 
     try {
       await axios.post(
-        "http://localhost:5050/api/auth/register",
+        "/api/auth/register",
         {
           firstName: formData.fname,
           lastName: formData.lname,
