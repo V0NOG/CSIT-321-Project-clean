@@ -16,8 +16,6 @@ Two-factor authentication (2FA) adds an extra layer of security. After enabling 
 
 ## Enabling 2FA
 
-[Insert screenshot of the TOTP Setup page here]
-
 1. Click your profile icon in the top-right corner of the header.
 2. Navigate to **Security** → **Two-Factor Authentication** (or go directly to `/security/mfa`).
 3. Click **Set Up Two-Factor Authentication**.

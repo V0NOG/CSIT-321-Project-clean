@@ -8,8 +8,6 @@ sidebar_label: Cloud Storage
 
 Cipher Cloud stores your encrypted files in your personal Dropbox or Google Drive account. You must connect **at least one** cloud storage account before you can upload files.
 
-[Insert screenshot of the Storage Connectors page here]
-
 ---
 
 ## Connecting Dropbox
