@@ -6,6 +6,8 @@ sidebar_label: Troubleshooting
 
 # Troubleshooting
 
+The issues below are the problems a user is most likely to face during testing most of them are caused by missing cloud connections, expired sessions, browser restrictions, or interrupted uploads.
+
 ---
 
 ## Backend / Server Errors

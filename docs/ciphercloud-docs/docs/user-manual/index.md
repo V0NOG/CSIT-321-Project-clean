@@ -9,9 +9,9 @@ slug: /user-manual
 
 **Version:** 1.0 | **Date:** 27 May 2026 | **Audience:** End Users
 
-Cipher Cloud is a private, encrypted cloud file storage service. Unlike standard cloud storage services such as Dropbox or Google Drive, Cipher Cloud encrypts your files **inside your web browser** before they are sent anywhere. This means that even Cipher Cloud itself — and your cloud storage provider — cannot read the contents of your files.
+Cipher Cloud is a web app for storing files in a more private way, when you upload a file the encryption happens in your browser first. The encrypted version is then sent to Dropbox or Google Drive this means the server should not receive the readable version of the file.
 
-Your files are kept private at all times. When you download a file, Cipher Cloud fetches the encrypted version and decrypts it on your device. The unencrypted file never travels over the internet.
+Your files are kept private at all times when you download a file Cipher Cloud fetches the encrypted version and decrypts it on your device the unencrypted file never travels over the internet.
 
 ---
 

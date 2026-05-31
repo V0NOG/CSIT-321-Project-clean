@@ -13,11 +13,15 @@ slug: /technical-report
 
 ## Project Summary
 
-Cipher Cloud is a zero knowledge encrypted file storage and sharing platform. Users store files in personal cloud accounts (Dropbox, Google Drive) with all file content encrypted client-side before it leaves the browser. The server never handles plaintext file content or unprotected private keys.
+Cipher Cloud is our capstone project for encrypted file storage and sharing the main idea is that files are encrypted on the client side before upload, so the backend mainly handles accounts, metadata, sharing records, audit logs, and cloud connector coordination. This made the project more complex than a normal file manager because upload, download, and sharing all needed key handling logic. 
+
+During development the hardest part was balancing usability with the zero knowledge design a normal file manager can send files directly to the server but Cipher Cloud needed extra steps for encryption, key wrapping, cloud upload, and decryption during download. This affected how the frontend, backend, and database were designed some parts such as sharing and account recovery were more difficult than expected because the server cannot simply access the user’s private key this helped us understand why privacy focused systems require careful design beyond just adding encryption.
 
 ---
 
 ## Iteration History
+
+In practice, the iterations were not perfectly separate. Some features, such as sharing and folder management, had to be revisited after the encryption workflow changed. The most difficult part was making the system usable while still keeping the zero knowledge model clear.
 
 | Iteration | Focus | Key Deliverables |
 |-----------|-------|-----------------|

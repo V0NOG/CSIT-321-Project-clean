@@ -52,6 +52,7 @@ app.use((req, _res, next) => {
 app.get("/", (_req, res) => res.send("API is working"));
 
 // Swagger UI — available at http://localhost:5050/api-docs
+app.get("/api-docs.json", (_req, res) => res.json(swaggerSpec));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customSiteTitle: "Cipher Cloud API Docs",
   swaggerOptions: { persistAuthorization: true },

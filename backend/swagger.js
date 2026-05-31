@@ -1,4 +1,9 @@
 import swaggerJSDoc from "swagger-jsdoc";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const backendUrl = process.env.BACKEND_URL || "http://localhost:5050";
 
 const options = {
   definition: {
@@ -14,8 +19,8 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:5050",
-        description: "Local development server",
+        url: backendUrl,
+        description: process.env.BACKEND_URL ? "Production API server" : "Local development server",
       },
     ],
     components: {
@@ -142,7 +147,7 @@ const options = {
     },
     security: [{ bearerAuth: [] }],
   },
-  apis: ["./routes/*.js"],
+  apis: [join(__dirname, "routes/*.js")],
 };
 
 const swaggerSpec = swaggerJSDoc(options);

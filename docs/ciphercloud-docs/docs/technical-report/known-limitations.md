@@ -6,7 +6,7 @@ sidebar_label: Known Limitations
 
 # Known Limitations
 
-The following limitations were identified during development and were accepted within the academic project scope. They represent known technical debt or design trade-offs that must be addressed before any production deployment.
+These limitations are included because the current version is a capstone prototype, not a production ready storage platform the most important fixes before production would be rate limiting, stronger session handling, improved recovery options, and broader security testing.
 
 ---
 
