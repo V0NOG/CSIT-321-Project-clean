@@ -8,8 +8,6 @@ sidebar_label: Account Setup & Sign In
 
 ## Creating an Account
 
-[Insert screenshot of the Sign-Up page here]
-
 1. Open Cipher Cloud in your browser and navigate to the sign-up page (`/signup`).
 2. Fill in the registration form:
    - **First Name** — your given name
@@ -36,8 +34,6 @@ If you sign up with Google, you will not have a separate password for Cipher Clo
 ---
 
 ## Signing In
-
-[Insert screenshot of the Sign-In page here]
 
 ### Email and Password
 
